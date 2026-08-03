@@ -60,12 +60,18 @@ main { max-width: 640px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   background: #000;
   border-radius: var(--radius);
   overflow: hidden;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 3px solid transparent;
+  transition: border-color .15s;
 }
 #video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* Quando il bimbo si muove: bordo rosso lampeggiante attorno al video. */
+.video-card.motion { border-color: var(--danger); animation: borderPulse 1s infinite; }
+@keyframes borderPulse { 0%,100% { border-color: var(--danger); } 50% { border-color: rgba(255,90,106,.3); } }
 
 .motion-badge {
   position: absolute;
@@ -73,13 +79,14 @@ main { max-width: 640px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   left: 12px;
   background: var(--danger);
   color: #fff;
-  padding: 6px 12px;
+  padding: 10px 18px;
   border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.85rem;
-  animation: pulse 1s infinite;
+  font-weight: 800;
+  font-size: 1.1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  animation: pulse 0.8s infinite;
 }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.06); opacity: 0.75; } }
 
 .controls, .lullabies {
   background: var(--card);
@@ -242,6 +249,18 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .qr-url {
   text-align: center; color: var(--muted); font-size: 0.9rem;
   word-break: break-all; margin-bottom: 14px;
+}
+
+/* ---- LANDSCAPE: video grande a sinistra, comandi a destra ---------- */
+@media (orientation: landscape) and (min-width: 680px) {
+  main {
+    max-width: 1100px;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .video-card { grid-column: 1; grid-row: 1 / span 2; }
+  .controls   { grid-column: 2; grid-row: 1; }
+  .lullabies  { grid-column: 2; grid-row: 2; }
 }
 
 .hidden { display: none !important; }

@@ -32,6 +32,7 @@ class Monitor:
         self.last_ratio = 0.0
         self.active = False
         self.motion_count = 0
+        self._last_active = False
 
     def start(self) -> None:
         if self._running:
@@ -93,4 +94,13 @@ class Monitor:
                 self.bus.publish("motion", {
                     "count": self.motion_count,
                     "ratio": round(result.ratio, 4),
+                })
+
+            # Pubblica in tempo reale l'inizio/fine del movimento, cosi' la
+            # webapp mostra subito il simbolo e fa il beep (senza attese).
+            if result.active != self._last_active:
+                self._last_active = result.active
+                self.bus.publish("motion_state", {
+                    "active": result.active,
+                    "count": self.motion_count,
                 })

@@ -17,6 +17,7 @@
     <div class="brand">👶 Baby Monitor</div>
     <div class="topbar-right">
       <div id="status-pill" class="pill pill--off">Connessione…</div>
+      <button id="sound-btn" class="icon-btn" title="Suono avviso on/off" aria-label="Suono">🔔</button>
       <button id="qr-btn" class="icon-btn" title="Apri su un altro dispositivo" aria-label="QR">📱</button>
       <button id="settings-btn" class="icon-btn" title="Configura camera" aria-label="Configura">⚙️</button>
     </div>
@@ -29,7 +30,7 @@
   <main>
     <section class="video-card">
       <img id="video" alt="Video della camera" />
-      <div id="motion-badge" class="motion-badge hidden">● Movimento</div>
+      <div id="motion-badge" class="motion-badge hidden">👶 Si muove!</div>
     </section>
 
     <section class="controls">
@@ -65,16 +66,6 @@
       </div>
     </section>
   </main>
-
-  <!-- Popup di allarme movimento -->
-  <div id="alert" class="alert-overlay hidden" role="alertdialog" aria-live="assertive">
-    <div class="alert-box">
-      <div class="alert-emoji">👶</div>
-      <div class="alert-title">Il bimbo si è mosso!</div>
-      <div id="alert-time" class="alert-time"></div>
-      <button id="alert-dismiss" class="btn btn--primary">Ho capito</button>
-    </div>
-  </div>
 
   <!-- Finestra QR: apri l'app su un altro dispositivo -->
   <div id="qr-modal" class="alert-overlay hidden" role="dialog">

@@ -12,8 +12,6 @@
   const motionCount = $("motion-count");
   const sensitivity = $("sensitivity");
   const sensValue = $("sens-value");
-  const alertBox = $("alert");
-  const alertTime = $("alert-time");
   const player = $("player");
   const nowPlaying = $("now-playing");
   const npTitle = $("np-title");
@@ -25,22 +23,58 @@
   video.onerror = () => setTimeout(() => { video.src = "stream.mjpg?" + Date.now(); }, 3000);
 
   // ---- suono (beep sintetico, funziona offline, nessun file) ----------
-  function beep(freq = 880, dur = 0.8, vol = 0.4) {
+  // Un solo AudioContext condiviso, "sbloccato" al primo tocco (richiesto da iOS).
+  let audioCtx = null;
+  function ensureAudio() {
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) audioCtx = new Ctx();
+      }
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) { /* ignora */ }
+    return audioCtx;
+  }
+  function beep(freq = 880, dur = 0.35, vol = 0.5) {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    try {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
       osc.connect(gain).connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + dur + 0.05);
     } catch (e) { /* ignora */ }
+  }
+
+  // Beep ripetuto finche' il bimbo si muove.
+  let beepTimer = null;
+  let soundOn = true;
+  function startBeeping() {
+    if (beepTimer || !soundOn) return;
+    beep();
+    beepTimer = setInterval(() => beep(), 1200);
+  }
+  function stopBeeping() {
+    if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+  }
+
+  // ---- simbolo "il bimbo si muove" (tempo reale) ---------------------
+  const videoCard = document.querySelector(".video-card");
+  function setMotionActive(active) {
+    motionBadge.classList.toggle("hidden", !active);
+    if (videoCard) videoCard.classList.toggle("motion", active);
+    if (active && motionToggle.checked) {
+      startBeeping();
+      if (navigator.vibrate) navigator.vibrate(200);
+    } else {
+      stopBeeping();
+    }
   }
 
   // ---- tieni lo schermo acceso mentre fai da monitor ------------------
@@ -58,23 +92,15 @@
     if (document.visibilityState === "visible") keepScreenAwake();
   });
 
-  // ---- popup di allarme ----------------------------------------------
-  function showAlert() {
-    const now = new Date();
-    alertTime.textContent = "Ore " + now.toLocaleTimeString("it-IT");
-    alertBox.classList.remove("hidden");
-    beep(); setTimeout(beep, 900); setTimeout(beep, 1800);
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-    // Notifica del browser (utile se sei su un'altra scheda, app aperta).
+  // Notifica del browser sul nuovo movimento (utile se sei su un'altra scheda).
+  function notifyMotion() {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("👶 Il bimbo si è mosso!", {
-        body: now.toLocaleTimeString("it-IT"),
+        body: new Date().toLocaleTimeString("it-IT"),
         tag: "baby-motion",
       });
     }
   }
-  $("alert-dismiss").onclick = () => alertBox.classList.add("hidden");
 
   // ---- stato ----------------------------------------------------------
   function applyStatus(s) {
@@ -91,7 +117,7 @@
       sensitivity.value = s.sensitivity;
       sensValue.textContent = s.sensitivity;
     }
-    motionBadge.classList.toggle("hidden", !s.active);
+    setMotionActive(!!s.active && !!s.motion_enabled);
   }
 
   // ---- avviso "fuori portata" (collegamento col cervello perso) -------
@@ -122,9 +148,15 @@
       try { msg = JSON.parse(ev.data); } catch { return; }
       setLinkLost(false);
       if (msg.type === "status") applyStatus(msg.data);
-      else if (msg.type === "motion") {
+      else if (msg.type === "motion_state") {
+        // inizio/fine movimento in tempo reale -> simbolo + beep
+        setMotionActive(!!msg.data.active && motionToggle.checked);
+        if (typeof msg.data.count === "number") {
+          motionCount.textContent = msg.data.count + " rilevamenti";
+        }
+      } else if (msg.type === "motion") {
         motionCount.textContent = (msg.data.count || 0) + " rilevamenti";
-        if (motionToggle.checked) showAlert();
+        if (motionToggle.checked) notifyMotion();
       }
     };
     es.onerror = () => {
@@ -147,7 +179,10 @@
       applyStatus(await r.json());
     } catch (e) { /* offline temporaneo */ }
   }
-  motionToggle.onchange = () => postMotion({ enabled: motionToggle.checked });
+  motionToggle.onchange = () => {
+    if (!motionToggle.checked) setMotionActive(false);
+    postMotion({ enabled: motionToggle.checked });
+  };
   sensitivity.oninput = () => { sensValue.textContent = sensitivity.value; };
   sensitivity.onchange = () => postMotion({ sensitivity: parseInt(sensitivity.value, 10) });
 
@@ -208,6 +243,17 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
+  // Pulsante suono: accende/spegne il beep di avviso.
+  const soundBtn = $("sound-btn");
+  if (soundBtn) {
+    soundBtn.onclick = () => {
+      soundOn = !soundOn;
+      soundBtn.textContent = soundOn ? "🔔" : "🔕";
+      if (!soundOn) stopBeeping();
+      else ensureAudio();
+    };
+  }
+
   // Pulsante QR: mostra l'indirizzo per aprire l'app su un altro dispositivo.
   const qrBtn = $("qr-btn");
   const qrModal = $("qr-modal");
@@ -256,12 +302,13 @@
   }
 
   // ---- avvio ----------------------------------------------------------
-  // Chiediamo il permesso notifiche al primo tocco (richiesto da iOS).
-  document.body.addEventListener("click", function askOnce() {
+  // Al primo tocco: sblocca l'audio (richiesto da iOS) e chiede le notifiche.
+  document.body.addEventListener("click", function armOnce() {
+    ensureAudio();
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
-    document.body.removeEventListener("click", askOnce);
+    document.body.removeEventListener("click", armOnce);
   }, { once: true });
 
   if ("serviceWorker" in navigator) {
