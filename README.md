@@ -134,6 +134,28 @@ Così avrai un'icona come un'app vera, a schermo intero.
 
 ---
 
+## 🚶 Usarlo come monitor "portatile" (unità genitore)
+
+Puoi lasciare **camera e cervello fermi** in casa e portarti in giro solo lo
+**schermo** (iPad o telefono), come l'unità genitore di un baby monitor:
+
+- La **camera** sta nella stanza del bimbo.
+- Il **cervello** (Mi 9 SE / Pi / PC) sta fermo e attaccato alla corrente,
+  **ovunque** sul WiFi (non deve stare vicino alla camera).
+- Ti porti in giro l'**iPad/telefono** con la webapp aperta: finché sei nel
+  raggio del WiFi vedi il video e ricevi i popup.
+
+Due aiuti pensati per questo uso, già inclusi:
+- **Schermo sempre acceso**: mentre la webapp è aperta, il dispositivo non si
+  spegne da solo (così non perdi gli allarmi).
+- **Avviso "fuori portata"**: se esci dal raggio WiFi o il cervello si spegne,
+  compare un banner rosso con suono, come il "segnale perso" dei baby monitor.
+
+> Nota: perché l'allarme suoni, la webapp deve restare **aperta in primo
+> piano**. Se blocchi il dispositivo in tasca, iOS non fa suonare l'allarme
+> (limite di Apple). Vuoi gli avvisi anche a schermo spento? Si può aggiungere
+> (meglio su Android) — chiedi pure.
+
 ## 📱 Come si usa
 
 - **Video live** in alto (aggiornato in tempo reale).

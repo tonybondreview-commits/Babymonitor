@@ -43,6 +43,16 @@ body {
 .pill--on { background: rgba(55, 211, 155, 0.18); color: var(--ok); }
 .pill--off { background: rgba(255, 90, 106, 0.18); color: var(--danger); }
 
+.offline-banner {
+  background: var(--danger);
+  color: #fff;
+  text-align: center;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  animation: pulse 1.2s infinite;
+}
+
 main { max-width: 640px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
 
 .video-card {

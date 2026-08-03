@@ -18,15 +18,14 @@
   const nowPlaying = $("now-playing");
   const npTitle = $("np-title");
   const loopToggle = $("loop-toggle");
-
-  let alarmOsc = null; // suono d'allarme generato via WebAudio (nessun file)
+  const offlineBanner = $("offline-banner");
 
   // ---- video live -----------------------------------------------------
   video.src = "stream.mjpg";
   video.onerror = () => setTimeout(() => { video.src = "stream.mjpg?" + Date.now(); }, 3000);
 
-  // ---- suono d'allarme (beep sintetico, funziona offline) -------------
-  function beep() {
+  // ---- suono (beep sintetico, funziona offline, nessun file) ----------
+  function beep(freq = 880, dur = 0.8, vol = 0.4) {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -34,15 +33,30 @@
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.value = 880;
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      gain.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
       osc.connect(gain).connect(ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + 0.85);
+      osc.stop(ctx.currentTime + dur + 0.05);
     } catch (e) { /* ignora */ }
   }
+
+  // ---- tieni lo schermo acceso mentre fai da monitor ------------------
+  // (utile quando ti porti il dispositivo in giro per casa)
+  let wakeLock = null;
+  async function keepScreenAwake() {
+    try {
+      if ("wakeLock" in navigator && document.visibilityState === "visible") {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      }
+    } catch (e) { /* alcuni browser lo negano finche' non tocchi lo schermo */ }
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") keepScreenAwake();
+  });
 
   // ---- popup di allarme ----------------------------------------------
   function showAlert() {
@@ -80,12 +94,33 @@
     motionBadge.classList.toggle("hidden", !s.active);
   }
 
+  // ---- avviso "fuori portata" (collegamento col cervello perso) -------
+  let linkLost = false;
+  let lostBeepTimer = null;
+  function setLinkLost(lost) {
+    if (lost === linkLost) return;
+    linkLost = lost;
+    offlineBanner.classList.toggle("hidden", !lost);
+    if (lost) {
+      // suono discendente ripetuto, diverso dall'allarme movimento
+      const warn = () => { beep(440, 0.5, 0.5); setTimeout(() => beep(300, 0.5, 0.5), 250); };
+      warn();
+      lostBeepTimer = setInterval(warn, 5000);
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    } else {
+      clearInterval(lostBeepTimer);
+      lostBeepTimer = null;
+    }
+  }
+
   // ---- eventi in tempo reale (SSE) -----------------------------------
   function connectEvents() {
     const es = new EventSource("events");
+    es.onopen = () => setLinkLost(false);
     es.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
+      setLinkLost(false);
       if (msg.type === "status") applyStatus(msg.data);
       else if (msg.type === "motion") {
         motionCount.textContent = (msg.data.count || 0) + " rilevamenti";
@@ -95,7 +130,9 @@
     es.onerror = () => {
       statusPill.textContent = "Riconnessione…";
       statusPill.className = "pill pill--off";
-      // EventSource riprova da solo; forziamo comunque un refresh stato.
+      // Il collegamento col cervello e' caduto (WiFi fuori portata o cervello
+      // spento). EventSource riprova da solo; intanto avvisiamo.
+      setLinkLost(true);
     };
   }
 
@@ -181,8 +218,15 @@
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
+  keepScreenAwake();
   connectEvents();
   loadLullabies();
-  // Aggiorna lo stato periodicamente come rete di sicurezza.
-  setInterval(() => fetch("api/status").then((r) => r.json()).then(applyStatus).catch(() => {}), 10000);
+  // Aggiorna lo stato periodicamente come rete di sicurezza; se la richiesta
+  // fallisce, siamo probabilmente fuori portata.
+  setInterval(() => {
+    fetch("api/status")
+      .then((r) => r.json())
+      .then((s) => { setLinkLost(false); applyStatus(s); })
+      .catch(() => setLinkLost(true));
+  }, 10000);
 })();
