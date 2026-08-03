@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0e1420">
+  <meta name="theme-color" content="#0b0f17">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Baby Monitor">
@@ -14,9 +14,9 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">👶 Baby Monitor</div>
+    <div class="brand"><span class="brand-ico">👶</span> Baby&nbsp;Monitor</div>
     <div class="topbar-right">
-      <div id="status-pill" class="pill pill--off">Connessione…</div>
+      <div id="status-pill" class="pill pill--off"><span class="pill-dot"></span><span id="status-text">Connessione…</span></div>
       <button id="sound-btn" class="icon-btn" title="Suono avviso on/off" aria-label="Suono">🔔</button>
       <button id="qr-btn" class="icon-btn" title="Apri su un altro dispositivo" aria-label="QR">📱</button>
       <button id="settings-btn" class="icon-btn" title="Configura camera" aria-label="Configura">⚙️</button>
@@ -28,12 +28,16 @@
   </div>
 
   <main>
-    <section class="video-card">
+    <section class="video-card" id="video-card">
       <img id="video" alt="Video della camera" />
-      <div id="motion-badge" class="motion-badge hidden">👶 Si muove!</div>
+      <div class="video-top">
+        <span class="live-badge"><span class="live-dot"></span> LIVE</span>
+        <div id="motion-badge" class="motion-badge hidden">👶 Si muove!</div>
+      </div>
+      <button id="fs-btn" class="fs-btn" title="Schermo intero" aria-label="Schermo intero">⛶</button>
     </section>
 
-    <section class="controls">
+    <section class="card controls">
       <div class="row">
         <label class="switch">
           <input type="checkbox" id="motion-toggle" checked>
@@ -45,15 +49,17 @@
         </div>
       </div>
 
-      <div class="row column">
-        <div class="row-label"><strong>Sensibilità</strong> <small id="sens-value">55</small></div>
+      <div class="divider"></div>
+
+      <div class="field">
+        <div class="field-head"><strong>Sensibilità</strong> <span id="sens-value" class="chip">55</span></div>
         <input type="range" id="sensitivity" min="1" max="100" value="55">
         <div class="range-hints"><span>Meno falsi allarmi</span><span>Più sensibile</span></div>
       </div>
     </section>
 
-    <section class="lullabies">
-      <h2>🎵 Ninna nanne</h2>
+    <section class="card lullabies">
+      <div class="card-head"><h2>🎵 Ninna nanne</h2></div>
       <p class="hint">Suonano da <em>questo</em> dispositivo: tienilo vicino alla culla.</p>
       <div id="lullaby-list" class="lullaby-list"></div>
       <label class="btn btn--add" for="lullaby-upload">➕ Aggiungi ninna nanna</label>
@@ -67,18 +73,21 @@
     </section>
   </main>
 
-  <!-- Finestra QR: apri l'app su un altro dispositivo -->
-  <div id="qr-modal" class="alert-overlay hidden" role="dialog">
-    <div class="alert-box">
-      <div class="alert-title">📱 Apri su un altro dispositivo</div>
+  <!-- Suono d'allarme (file audio: affidabile anche su iPhone) -->
+  <audio id="beep-audio" src="beep.wav" preload="auto"></audio>
+
+  <!-- Finestra QR -->
+  <div id="qr-modal" class="modal-overlay hidden" role="dialog">
+    <div class="modal-box">
+      <div class="modal-title">📱 Apri su un altro dispositivo</div>
       <p class="hint">Inquadra il QR con la fotocamera, sulla stessa rete WiFi.</p>
       <div id="qr-holder" class="qr-holder"></div>
       <div id="qr-url" class="qr-url"></div>
-      <button id="qr-close" class="btn btn--primary">Chiudi</button>
+      <button id="qr-close" class="btn btn--primary btn--block">Chiudi</button>
     </div>
   </div>
 
-  <!-- Wizard di prima configurazione (mostrato solo se non configurato) -->
+  <!-- Wizard di prima configurazione -->
   <div id="wizard" class="wizard-overlay hidden"></div>
 
   <script src="wizard.js"></script>

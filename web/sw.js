@@ -2,7 +2,7 @@
  * anche in caso di micro-interruzioni di rete. NON mette in cache il video
  * live ne' gli eventi (devono essere sempre in tempo reale). */
 
-const CACHE = "baby-monitor-v4";
+const CACHE = "baby-monitor-v5";
 const SHELL = [
   ".",
   "index.html",
@@ -10,6 +10,7 @@ const SHELL = [
   "app.js",
   "wizard.js",
   "manifest.json",
+  "beep.wav",
   "icon-192.png",
   "icon-512.png",
 ];

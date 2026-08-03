@@ -7,6 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const video = $("video");
   const statusPill = $("status-pill");
+  const statusText = $("status-text");
   const motionBadge = $("motion-badge");
   const motionToggle = $("motion-toggle");
   const motionCount = $("motion-count");
@@ -17,55 +18,34 @@
   const npTitle = $("np-title");
   const loopToggle = $("loop-toggle");
   const offlineBanner = $("offline-banner");
+  const beepAudio = $("beep-audio");
+  const videoCard = $("video-card");
 
   // ---- video live -----------------------------------------------------
   video.src = "stream.mjpg";
   video.onerror = () => setTimeout(() => { video.src = "stream.mjpg?" + Date.now(); }, 3000);
 
-  // ---- suono (beep sintetico, funziona offline, nessun file) ----------
-  // Un solo AudioContext condiviso, "sbloccato" al primo tocco (richiesto da iOS).
-  let audioCtx = null;
-  function ensureAudio() {
-    try {
-      if (!audioCtx) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx) audioCtx = new Ctx();
-      }
-      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-    } catch (e) { /* ignora */ }
-    return audioCtx;
-  }
-  function beep(freq = 880, dur = 0.35, vol = 0.5) {
-    const ctx = ensureAudio();
-    if (!ctx) return;
-    try {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + dur + 0.05);
-    } catch (e) { /* ignora */ }
-  }
-
-  // Beep ripetuto finche' il bimbo si muove.
-  let beepTimer = null;
+  // ---- suono d'allarme (file audio: affidabile anche su iPhone) -------
   let soundOn = true;
+  function unlockAudio() {
+    // iOS: il primo play va fatto durante un tocco per "sbloccare" l'audio.
+    try {
+      const p = beepAudio.play();
+      if (p) p.then(() => { beepAudio.pause(); beepAudio.currentTime = 0; }).catch(() => {});
+    } catch (e) { /* ignora */ }
+  }
   function startBeeping() {
-    if (beepTimer || !soundOn) return;
-    beep();
-    beepTimer = setInterval(() => beep(), 1200);
+    if (!soundOn) return;
+    try { beepAudio.loop = true; beepAudio.currentTime = 0; beepAudio.play().catch(() => {}); } catch (e) {}
   }
   function stopBeeping() {
-    if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+    try { beepAudio.loop = false; beepAudio.pause(); beepAudio.currentTime = 0; } catch (e) {}
+  }
+  function testBeep() {
+    try { beepAudio.loop = false; beepAudio.currentTime = 0; beepAudio.play().catch(() => {}); } catch (e) {}
   }
 
   // ---- simbolo "il bimbo si muove" (tempo reale) ---------------------
-  const videoCard = document.querySelector(".video-card");
   function setMotionActive(active) {
     motionBadge.classList.toggle("hidden", !active);
     if (videoCard) videoCard.classList.toggle("motion", active);
@@ -76,6 +56,18 @@
       stopBeeping();
     }
   }
+
+  // ---- schermo intero (stile player) ---------------------------------
+  const fsBtn = $("fs-btn");
+  function toggleFs() {
+    const on = videoCard.classList.toggle("fs");
+    document.body.classList.toggle("fs-open", on);
+    if (fsBtn) fsBtn.textContent = on ? "✕" : "⛶";
+  }
+  if (fsBtn) fsBtn.onclick = toggleFs;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && videoCard.classList.contains("fs")) toggleFs();
+  });
 
   // ---- tieni lo schermo acceso mentre fai da monitor ------------------
   // (utile quando ti porti il dispositivo in giro per casa)
@@ -103,14 +95,12 @@
   }
 
   // ---- stato ----------------------------------------------------------
+  function setStatus(text, ok) {
+    if (statusText) statusText.textContent = text;
+    statusPill.className = "pill " + (ok ? "pill--on" : "pill--off");
+  }
   function applyStatus(s) {
-    if (s.connected) {
-      statusPill.textContent = "Camera connessa";
-      statusPill.className = "pill pill--on";
-    } else {
-      statusPill.textContent = "Camera offline";
-      statusPill.className = "pill pill--off";
-    }
+    setStatus(s.connected ? "Camera connessa" : "Camera offline", s.connected);
     motionToggle.checked = !!s.motion_enabled;
     motionCount.textContent = (s.motion_count || 0) + " rilevamenti";
     if (typeof s.sensitivity === "number") {
@@ -128,11 +118,11 @@
     linkLost = lost;
     offlineBanner.classList.toggle("hidden", !lost);
     if (lost) {
-      // suono discendente ripetuto, diverso dall'allarme movimento
-      const warn = () => { beep(440, 0.5, 0.5); setTimeout(() => beep(300, 0.5, 0.5), 250); };
-      warn();
-      lostBeepTimer = setInterval(warn, 5000);
+      stopBeeping();               // il movimento non e' piu' affidabile
+      testBeep();                  // un suono per avvisare della disconnessione
+      lostBeepTimer = setInterval(testBeep, 5000);
       if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+      setStatus("Riconnessione…", false);
     } else {
       clearInterval(lostBeepTimer);
       lostBeepTimer = null;
@@ -160,8 +150,6 @@
       }
     };
     es.onerror = () => {
-      statusPill.textContent = "Riconnessione…";
-      statusPill.className = "pill pill--off";
       // Il collegamento col cervello e' caduto (WiFi fuori portata o cervello
       // spento). EventSource riprova da solo; intanto avvisiamo.
       setLinkLost(true);
@@ -243,14 +231,14 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
-  // Pulsante suono: accende/spegne il beep di avviso.
+  // Pulsante suono: accende/spegne il beep di avviso (e lo fa sentire subito).
   const soundBtn = $("sound-btn");
   if (soundBtn) {
     soundBtn.onclick = () => {
       soundOn = !soundOn;
       soundBtn.textContent = soundOn ? "🔔" : "🔕";
       if (!soundOn) stopBeeping();
-      else ensureAudio();
+      else testBeep();   // suono di prova: cosi' sai che l'audio funziona
     };
   }
 
@@ -304,7 +292,7 @@
   // ---- avvio ----------------------------------------------------------
   // Al primo tocco: sblocca l'audio (richiesto da iOS) e chiede le notifiche.
   document.body.addEventListener("click", function armOnce() {
-    ensureAudio();
+    unlockAudio();
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
