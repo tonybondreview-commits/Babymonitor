@@ -1,0 +1,19 @@
+# Configurazione con dati privati (password camera)
+config.yaml
+
+# File audio delle ninna nanne (mettili tu in locale)
+lullabies/*
+!lullabies/README.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Sistema
+.DS_Store
+Thumbs.db

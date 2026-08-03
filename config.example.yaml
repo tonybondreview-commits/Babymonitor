@@ -1,0 +1,32 @@
+# Configurazione del Baby Monitor.
+# Copia questo file in "config.yaml" e modifica i tuoi dati.
+#   cp config.example.yaml config.yaml
+
+camera:
+  # IP della camera Fredi sulla rete di casa (lo trovi nel router o nell'app).
+  ip: "192.168.1.100"
+  rtsp_port: 554
+  username: "admin"
+  # Meglio NON scrivere la password qui: usa la variabile d'ambiente
+  # CAMERA_PASSWORD (vedi README). Se la metti qui, tienila privata.
+  password: ""
+  # "sub" = sottostream (leggero, consigliato); "main" = alta qualita'.
+  stream: "sub"
+  # In alternativa, se conosci l'URL RTSP completo, mettilo qui e ignora i campi sopra:
+  # rtsp_url: "rtsp://admin:pass@192.168.1.100:554/onvif2"
+  rtsp_url: ""
+
+motion:
+  enabled: true
+  sensitivity: 55          # 1 = poco sensibile, 100 = molto sensibile
+  cooldown_seconds: 15     # attesa minima tra due allarmi
+  consecutive_frames: 3    # fotogrammi consecutivi per confermare il movimento
+  warmup_frames: 20        # fotogrammi iniziali per stabilizzarsi
+
+lullaby:
+  directory: "lullabies"   # cartella con i file audio delle ninna nanne
+  default_target: "browser"
+
+server:
+  host: "0.0.0.0"          # 0.0.0.0 = raggiungibile da tutta la rete di casa
+  port: 8080
