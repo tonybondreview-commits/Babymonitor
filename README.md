@@ -74,8 +74,8 @@ cd Babymonitor
 pip install -r requirements.txt
 ```
 
-> Su Raspberry Pi / Debian, se `opencv-python-headless` desse problemi:
-> `sudo apt install python3-opencv` e poi installa il resto.
+> Serve anche **ffmpeg** installato nel sistema (legge il video della camera):
+> Debian/Raspberry Pi `sudo apt install ffmpeg`, macOS `brew install ffmpeg`.
 
 > 📱 **Usi un telefono Android (es. Xiaomi Mi 9 SE) come cervello?**
 > Non installare a mano: dopo aver scaricato il progetto in **Termux**, lancia

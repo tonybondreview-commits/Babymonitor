@@ -15,8 +15,8 @@ if [ ! -d "$PREFIX" ] || [ -z "$PREFIX" ]; then
   echo "ATTENZIONE: questo script va eseguito dentro Termux."
 fi
 
-# Alcuni mirror auto-selezionati di Termux sono incompleti e non hanno
-# opencv-python ("E: Unable to locate package"). Puntiamo al mirror UFFICIALE.
+# Alcuni mirror auto-selezionati di Termux sono incompleti. Puntiamo al
+# mirror UFFICIALE per evitare "E: Unable to locate package".
 echo "==> Imposto il magazzino ufficiale di Termux..."
 echo "deb https://packages.termux.dev/apt/termux-main stable main" > "$PREFIX/etc/apt/sources.list" || true
 
@@ -24,20 +24,10 @@ echo "==> Aggiorno i pacchetti..."
 yes | pkg update || pkg update -y || true
 pkg upgrade -y || true
 
-# Prima i pacchetti essenziali (sempre disponibili), cosi' un'eventuale
-# mancanza di OpenCV non blocca tutto il resto.
-echo "==> Installo Python e git..."
-pkg install -y python git
-
-echo "==> Installo OpenCV..."
-# IMPORTANTE: su Android OpenCV si installa col pacchetto di Termux, NON con pip.
-if ! pkg install -y opencv-python; then
-  echo ""
-  echo "!! Non sono riuscito a installare 'opencv-python' dal mirror attuale."
-  echo "!! Prova a cambiare mirror con:  termux-change-repo"
-  echo "!! poi rilancia:  bash scripts/install-termux.sh"
-  exit 1
-fi
+# ffmpeg (lettura video), Pillow e numpy (analisi immagini): tutti disponibili
+# come pacchetti Termux gia' pronti. NIENTE OpenCV: non serve piu'.
+echo "==> Installo Python, ffmpeg, numpy e Pillow..."
+pkg install -y python git ffmpeg python-numpy python-pillow
 
 echo "==> Installo Flask, PyYAML e qrcode..."
 pip install --upgrade pip >/dev/null 2>&1 || true

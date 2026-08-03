@@ -1,5 +1,10 @@
+# Librerie Python. NB: serve anche "ffmpeg" installato nel sistema
+# (non e' un pacchetto pip):
+#   - Termux/Android:  pkg install ffmpeg
+#   - Debian/Raspberry Pi:  sudo apt install ffmpeg
+#   - macOS:  brew install ffmpeg
 flask>=3.0
-opencv-python-headless>=4.8
 numpy>=1.24
+Pillow>=10.0
 PyYAML>=6.0
 qrcode>=7.4

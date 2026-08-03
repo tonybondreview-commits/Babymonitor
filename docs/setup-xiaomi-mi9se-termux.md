@@ -5,9 +5,9 @@ Un telefono Android sempre acceso (es. **Xiaomi Mi 9 SE** o **Google Pixel**)
 la webapp. Gira dentro **Termux** (un terminale Linux per Android). Tutto
 resta offline, sulla rete di casa.
 
-> ⚠️ Due punti delicati, spiegati sotto: **OpenCV su Termux** (si installa con
-> `pkg`, non con `pip`) e le **impostazioni anti-chiusura** (poche su Pixel,
-> più numerose su Xiaomi/MIUI).
+> ⚠️ Punto delicato: le **impostazioni anti-chiusura** di Android (poche su
+> Pixel, più numerose su Xiaomi/MIUI). Il video lo legge **ffmpeg**, che si
+> installa senza problemi da Termux (niente OpenCV).
 
 ---
 
@@ -35,15 +35,14 @@ cd Babymonitor
 bash scripts/install-termux.sh
 ```
 
-L'installer fa **tutto** da solo: installa Python + OpenCV (col pacchetto
-Termux, non con pip), Flask e PyYAML, dà l'accesso alla memoria e prepara
-l'avvio automatico. Non devi modificare nessun file: la **camera si configura
-poi dal wizard** dentro l'app.
+L'installer fa **tutto** da solo: installa Python, **ffmpeg**, numpy e Pillow
+(coi pacchetti Termux già pronti), poi Flask/PyYAML/qrcode, dà l'accesso alla
+memoria e prepara l'avvio automatico. Non devi modificare nessun file: la
+**camera si configura poi dal wizard** dentro l'app.
 
-> **Perché non `pip install opencv-python`?** Su Android quella via prova a
-> compilare da zero e fallisce. L'installer usa `pkg install opencv-python`
-> (già pronto). Per lo stesso motivo sul telefono **non** usare
-> `pip install -r requirements.txt`.
+> **Nota:** il video viene letto con **ffmpeg** (non OpenCV, che su Termux non
+> è più disponibile). ffmpeg, numpy e Pillow si installano con `pkg` senza
+> compilare nulla. Sul telefono **non** usare `pip install -r requirements.txt`.
 
 ---
 
@@ -121,7 +120,7 @@ anche sul tuo telefono personale.
 | Sintomo | Soluzione |
 |---|---|
 | Dopo un po' smette di funzionare | Non hai fatto il wake-lock o il blocco nei recenti (vedi §4). |
-| `cv2` non trovato | Hai usato `pip` per opencv: usa `pkg install opencv-python`. |
+| errore su `ffmpeg` | Installa: `pkg install ffmpeg`. |
 | "Camera offline" | Controlla IP/credenziali e che ONVIF sia attivo in Yoosee. |
 | Non raggiungo la pagina dall'iPad | Stessa rete WiFi? IP del Mi 9 SE giusto? Riavvia `run.py`. |
 | Consuma troppa batteria | Tienilo in carica: da "cervello" 24/7 conviene sempre collegato. |

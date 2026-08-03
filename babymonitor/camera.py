@@ -1,60 +1,90 @@
 """Collegamento alla camera via RTSP e produzione dei fotogrammi.
 
-Usa OpenCV per aprire lo stream RTSP della camera Fredi/Yoosee. Espone:
-  - i fotogrammi grezzi (per l'analisi del movimento)
-  - l'ultimo fotogramma codificato in JPEG (per lo streaming MJPEG al browser)
+Usa **ffmpeg** (non OpenCV) per leggere lo stream RTSP della camera Fredi/Yoosee
+e produrre un flusso MJPEG. Da ogni fotogramma JPEG:
+  - serviamo direttamente i byte JPEG al browser (streaming MJPEG);
+  - con **Pillow** lo decodifichiamo in scala di grigi per l'analisi del movimento.
 
-La lettura avviene in un thread dedicato, cosi' il resto dell'app non si
-blocca mai in attesa della rete.
+Perche' ffmpeg e non OpenCV? Su Android/Termux il pacchetto OpenCV non e' piu'
+disponibile in modo affidabile, mentre ffmpeg c'e' sempre. ffmpeg + Pillow
+funzionano identici su Raspberry Pi, PC e telefono.
+
+La lettura avviene in un thread dedicato, con riconnessione automatica.
 """
 
 from __future__ import annotations
 
+import io
+import shutil
+import subprocess
 import threading
 import time
 
-import cv2
 import numpy as np
+from PIL import Image, ImageFilter
+
+_SOI = b"\xff\xd8"  # inizio di un fotogramma JPEG
+_EOI = b"\xff\xd9"  # fine di un fotogramma JPEG
 
 
-def test_rtsp(url: str, timeout: float = 8.0) -> dict:
-    """Prova ad aprire lo stream RTSP e a leggere un fotogramma.
+def _ffmpeg_bin() -> str:
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
+def split_jpegs(buffer: bytes) -> tuple[list[bytes], bytes]:
+    """Estrae i fotogrammi JPEG completi da un buffer MJPEG.
+
+    Ritorna (lista_di_jpeg_completi, resto_del_buffer_ancora_incompleto).
+    """
+    frames: list[bytes] = []
+    while True:
+        start = buffer.find(_SOI)
+        if start < 0:
+            if len(buffer) > 4_000_000:
+                buffer = b""  # sicurezza anti-crescita se non troviamo l'inizio
+            break
+        end = buffer.find(_EOI, start + 2)
+        if end < 0:
+            if start > 0:
+                buffer = buffer[start:]
+            break
+        frames.append(buffer[start:end + 2])
+        buffer = buffer[end + 2:]
+    return frames, buffer
+
+
+def test_rtsp(url: str, timeout: float = 12.0) -> dict:
+    """Prova a leggere un fotogramma dallo stream RTSP.
 
     Ritorna {"ok": bool, "error": str}. Usato dal wizard per verificare
-    subito se IP/utente/password sono corretti. Il tentativo gira in un
-    thread, cosi' non si blocca se la camera non risponde.
+    subito se IP/utente/password sono corretti.
     """
-    result: dict = {"ok": False, "error": ""}
-
-    def run():
-        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-        try:
-            if not cap.isOpened():
-                result["error"] = "impossibile aprire lo stream"
-                return
-            ok, frame = cap.read()
-            if ok and frame is not None:
-                result["ok"] = True
-            else:
-                result["error"] = "collegato ma nessun video ricevuto"
-        finally:
-            cap.release()
-
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
-    t.join(timeout)
-    if t.is_alive():
-        result["error"] = "timeout: la camera non risponde"
-    return result
+    cmd = [
+        _ffmpeg_bin(), "-nostdin", "-rtsp_transport", "tcp", "-i", url,
+        "-an", "-frames:v", "1", "-f", "mjpeg", "pipe:1", "-loglevel", "error",
+    ]
+    try:
+        p = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "timeout: la camera non risponde"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "ffmpeg non installato"}
+    if p.returncode == 0 and p.stdout[:2] == _SOI:
+        return {"ok": True, "error": ""}
+    err = (p.stderr or b"").decode("utf-8", "ignore").strip().splitlines()
+    return {"ok": False, "error": err[-1] if err else "collegamento non riuscito"}
 
 
 class Camera:
-    def __init__(self, rtsp_url: str, target_width: int = 480, reconnect_delay: float = 3.0):
+    def __init__(self, rtsp_url: str, target_width: int = 480, motion_width: int = 320,
+                 fps: int = 8, reconnect_delay: float = 3.0):
         self.rtsp_url = rtsp_url
-        self.target_width = target_width
+        self.target_width = target_width      # larghezza del video mostrato
+        self.motion_width = motion_width      # larghezza usata per l'analisi
+        self.fps = fps
         self.reconnect_delay = reconnect_delay
 
-        self._cap: cv2.VideoCapture | None = None
+        self._proc: subprocess.Popen | None = None
         self._thread: threading.Thread | None = None
         self._running = False
         self._lock = threading.Lock()
@@ -75,10 +105,22 @@ class Camera:
 
     def stop(self) -> None:
         self._running = False
+        self._kill()
         if self._thread:
             self._thread.join(timeout=5)
-        if self._cap:
-            self._cap.release()
+
+    def _kill(self) -> None:
+        p = self._proc
+        if p and p.poll() is None:
+            try:
+                p.terminate()
+                p.wait(timeout=3)
+            except Exception:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+        self._proc = None
 
     @property
     def connected(self) -> bool:
@@ -86,7 +128,6 @@ class Camera:
 
     # ---- accesso ai fotogrammi ----------------------------------------
     def read_gray(self) -> tuple[int, np.ndarray | None]:
-        """Ritorna (frame_id, fotogramma in scala di grigi) dell'ultimo frame."""
         with self._lock:
             return self._frame_id, self._latest_gray
 
@@ -95,60 +136,71 @@ class Camera:
             return self._latest_jpeg
 
     def wait_for_frame(self, last_id: int, timeout: float = 1.0) -> int:
-        """Attende un nuovo fotogramma rispetto a last_id (per MJPEG)."""
         with self._new_frame:
             self._new_frame.wait_for(lambda: self._frame_id != last_id, timeout=timeout)
             return self._frame_id
 
     # ---- thread interno ------------------------------------------------
-    def _open(self) -> bool:
-        cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
-        # Buffer piccolo -> meno latenza (mostriamo il "quasi live").
-        try:
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception:
-            pass
-        if not cap.isOpened():
-            cap.release()
-            return False
-        self._cap = cap
-        return True
+    def _spawn(self) -> subprocess.Popen:
+        cmd = [
+            _ffmpeg_bin(), "-nostdin", "-rtsp_transport", "tcp",
+            "-fflags", "nobuffer",
+            "-i", self.rtsp_url, "-an",
+            "-vf", f"fps={self.fps},scale={self.target_width}:-1",
+            "-f", "mjpeg", "-q:v", "7", "pipe:1", "-loglevel", "error",
+        ]
+        return subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, bufsize=0)
 
     def _loop(self) -> None:
         while self._running:
-            if self._cap is None and not self._open():
+            try:
+                self._proc = self._spawn()
+            except FileNotFoundError:
+                # ffmpeg non installato: non possiamo fare nulla, riproviamo.
                 self._connected = False
                 time.sleep(self.reconnect_delay)
                 continue
 
-            ok, frame = self._cap.read()
-            if not ok or frame is None:
-                # Connessione persa: chiudo e riprovo.
+            buffer = b""
+            last_frame = time.monotonic()
+            try:
+                while self._running:
+                    chunk = self._proc.stdout.read(8192)
+                    if not chunk:
+                        break  # ffmpeg terminato (camera irraggiungibile): riconnetti
+                    buffer += chunk
+                    # Estrai tutti i fotogrammi JPEG completi presenti nel buffer.
+                    frames, buffer = split_jpegs(buffer)
+                    for jpeg in frames:
+                        self._process(jpeg)
+                        last_frame = time.monotonic()
+                    if time.monotonic() - last_frame > 15:
+                        break  # nessun fotogramma da troppo tempo: riavvia
+            except Exception:
+                pass
+            finally:
                 self._connected = False
-                self._cap.release()
-                self._cap = None
+                self._kill()
+
+            if self._running:
                 time.sleep(self.reconnect_delay)
-                continue
 
-            self._connected = True
-            self._process(frame)
-
-    def _process(self, frame: np.ndarray) -> None:
-        h, w = frame.shape[:2]
-        if w > self.target_width:
-            scale = self.target_width / float(w)
-            frame = cv2.resize(frame, (self.target_width, int(h * scale)))
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (21, 21), 0)
-
-        ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-        jpeg = buf.tobytes() if ok else None
-
+    def _process(self, jpeg: bytes) -> None:
+        with self._lock:
+            self._latest_jpeg = jpeg
+        try:
+            img = Image.open(io.BytesIO(jpeg)).convert("L")
+            if img.width > self.motion_width:
+                h = max(1, int(img.height * self.motion_width / img.width))
+                img = img.resize((self.motion_width, h))
+            img = img.filter(ImageFilter.GaussianBlur(2))
+            gray = np.asarray(img, dtype=np.uint8)
+        except Exception:
+            return  # fotogramma corrotto: lo saltiamo
         with self._lock:
             self._latest_gray = gray
-            if jpeg is not None:
-                self._latest_jpeg = jpeg
             self._frame_id += 1
+            self._connected = True
         with self._new_frame:
             self._new_frame.notify_all()
