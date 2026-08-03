@@ -15,7 +15,10 @@
 <body>
   <header class="topbar">
     <div class="brand">👶 Baby Monitor</div>
-    <div id="status-pill" class="pill pill--off">Connessione…</div>
+    <div class="topbar-right">
+      <div id="status-pill" class="pill pill--off">Connessione…</div>
+      <button id="settings-btn" class="icon-btn" title="Configura camera" aria-label="Configura">⚙️</button>
+    </div>
   </header>
 
   <div id="offline-banner" class="offline-banner hidden">
@@ -51,6 +54,8 @@
       <h2>🎵 Ninna nanne</h2>
       <p class="hint">Suonano da <em>questo</em> dispositivo: tienilo vicino alla culla.</p>
       <div id="lullaby-list" class="lullaby-list"></div>
+      <label class="btn btn--add" for="lullaby-upload">➕ Aggiungi ninna nanna</label>
+      <input type="file" id="lullaby-upload" accept="audio/*" multiple hidden>
       <audio id="player" preload="none"></audio>
       <div id="now-playing" class="now-playing hidden">
         <span id="np-title"></span>
@@ -70,6 +75,10 @@
     </div>
   </div>
 
+  <!-- Wizard di prima configurazione (mostrato solo se non configurato) -->
+  <div id="wizard" class="wizard-overlay hidden"></div>
+
+  <script src="wizard.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

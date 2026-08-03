@@ -160,19 +160,52 @@
       const items = await r.json();
       list.innerHTML = "";
       if (!items.length) {
-        list.innerHTML = '<div class="empty">Nessuna ninna nanna.<br>Metti dei file audio nella cartella <code>lullabies/</code>.</div>';
+        list.innerHTML = '<div class="empty">Nessuna ninna nanna.<br>Tocca "Aggiungi ninna nanna" qui sotto.</div>';
         return;
       }
       for (const item of items) {
+        const row = document.createElement("div");
+        row.className = "lullaby-row";
         const btn = document.createElement("button");
         btn.className = "lullaby-item";
         btn.innerHTML = '<span class="ico">🎵</span><span>' + escapeHtml(item.title) + "</span>";
         btn.onclick = () => playLullaby(item, btn);
-        list.appendChild(btn);
+        const del = document.createElement("button");
+        del.className = "lullaby-del";
+        del.textContent = "🗑";
+        del.title = "Elimina";
+        del.onclick = async () => {
+          if (!confirm('Eliminare "' + item.title + '"?')) return;
+          await fetch("api/lullabies/" + encodeURIComponent(item.name), { method: "DELETE" }).catch(() => {});
+          loadLullabies();
+        };
+        row.appendChild(btn);
+        row.appendChild(del);
+        list.appendChild(row);
       }
     } catch (e) {
       list.innerHTML = '<div class="empty">Impossibile caricare le ninna nanne.</div>';
     }
+  }
+
+  // Caricamento di nuove ninna nanne dalla webapp.
+  const uploadInput = $("lullaby-upload");
+  if (uploadInput) {
+    uploadInput.onchange = async (ev) => {
+      for (const f of ev.target.files) {
+        const fd = new FormData();
+        fd.append("file", f);
+        await fetch("api/lullabies/upload", { method: "POST", body: fd }).catch(() => {});
+      }
+      uploadInput.value = "";
+      loadLullabies();
+    };
+  }
+
+  // Pulsante impostazioni: riapre il wizard di configurazione.
+  const settingsBtn = $("settings-btn");
+  if (settingsBtn && window.BabyWizard) {
+    settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
   function playLullaby(item, btn) {
@@ -217,6 +250,9 @@
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+
+  // Al primo avvio (camera non configurata) parte il wizard guidato.
+  if (window.BabyWizard) window.BabyWizard.maybeStart();
 
   keepScreenAwake();
   connectEvents();

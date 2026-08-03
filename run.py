@@ -15,11 +15,8 @@ import argparse
 import signal
 import sys
 
-from babymonitor.camera import Camera
 from babymonitor.config import Config
-from babymonitor.events import EventBus
-from babymonitor.lullaby import LullabyLibrary
-from babymonitor.monitor import Monitor
+from babymonitor.controller import Controller
 from babymonitor.server import create_app
 
 
@@ -29,24 +26,19 @@ def main() -> int:
     args = parser.parse_args()
 
     config = Config.load(args.config)
+    controller = Controller(config)
+    controller.start()
 
-    rtsp_url = config.camera.build_url()
-    print(f"[baby-monitor] Camera RTSP: {_mask(rtsp_url)}")
+    if not controller.is_configured():
+        print("[baby-monitor] Prima configurazione: apri l'app e segui il wizard.")
+    else:
+        print(f"[baby-monitor] Camera RTSP: {_mask(config.camera.build_url())}")
 
-    camera = Camera(rtsp_url)
-    bus = EventBus()
-    monitor = Monitor(config, camera, bus)
-    library = LullabyLibrary(config.lullaby.directory)
-
-    camera.start()
-    monitor.start()
-
-    app = create_app(config, monitor, bus, library)
+    app = create_app(controller)
 
     def shutdown(*_):
         print("\n[baby-monitor] Arresto...")
-        monitor.stop()
-        camera.stop()
+        controller.stop()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)

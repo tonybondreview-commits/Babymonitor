@@ -164,4 +164,71 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .alert-title { font-size: 1.3rem; font-weight: 700; margin: 10px 0 4px; }
 .alert-time { color: var(--muted); margin-bottom: 20px; }
 
+/* topbar destra + pulsante impostazioni */
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.icon-btn {
+  background: var(--card2); border: none; color: var(--text);
+  width: 38px; height: 38px; border-radius: 10px; font-size: 1.1rem; cursor: pointer;
+}
+
+/* riga ninna nanna con pulsante elimina */
+.lullaby-row { display: flex; gap: 8px; align-items: stretch; }
+.lullaby-row .lullaby-item { flex: 1; }
+.lullaby-del {
+  background: var(--card2); border: none; color: var(--muted);
+  border-radius: 12px; width: 52px; font-size: 1.1rem; cursor: pointer;
+}
+.lullaby-del:active { background: #3a2a2a; color: var(--danger); }
+
+.btn--add {
+  display: inline-block; text-align: center; background: var(--card2);
+  color: var(--text); border: 1px dashed #3a4a66;
+}
+
+/* ---- WIZARD -------------------------------------------------------- */
+.wizard-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8, 12, 20, 0.96);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px 16px; overflow-y: auto;
+}
+.wiz-box {
+  background: var(--card); border-radius: 20px; padding: 24px;
+  max-width: 460px; width: 100%; margin: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.wiz-progress { color: var(--muted); font-size: 0.8rem; margin-bottom: 12px; }
+.wiz-content h2 { margin: 0 0 12px; font-size: 1.3rem; }
+.wiz-content p { color: #cdd8ee; line-height: 1.5; }
+.wiz-emoji { font-size: 3rem; text-align: center; }
+.wiz-content label {
+  display: block; margin: 12px 0 4px; font-weight: 600; font-size: 0.9rem; color: var(--muted);
+}
+.wiz-content input, .wiz-content select {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid #33425f; background: var(--card2); color: var(--text);
+  font-size: 1rem; margin-top: 4px;
+}
+.wiz-content input[type=range] { padding: 0; }
+.wiz-full { width: 100%; margin-top: 14px; }
+.wiz-or { text-align: center; color: var(--muted); font-size: 0.85rem; margin: 18px 0 0; }
+.wiz-found { display: grid; gap: 8px; margin-top: 10px; }
+.wiz-cam, .wiz-lull {
+  background: var(--card2); border: 1px solid #33425f; color: var(--text);
+  padding: 12px 14px; border-radius: 10px; text-align: left; cursor: pointer; font-size: 1rem;
+}
+.wiz-warn { color: #ffcf7a; font-size: 0.9rem; }
+.wiz-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.btn--ghost { background: transparent; color: var(--muted); }
+.wiz-preview {
+  background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 4/3; margin: 10px 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.wiz-preview img { width: 100%; height: 100%; object-fit: contain; }
+.wiz-test { margin-top: 16px; padding: 16px; border-radius: 12px; font-weight: 600; text-align: center; }
+.wiz-test--wait { background: var(--card2); color: var(--muted); }
+.wiz-test--ok { background: rgba(55,211,155,.15); color: var(--ok); }
+.wiz-test--err { background: rgba(255,90,106,.12); color: var(--danger); }
+.wiz-test small { font-weight: 400; }
+
 .hidden { display: none !important; }

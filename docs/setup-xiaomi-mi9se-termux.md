@@ -22,45 +22,30 @@ riavvio del telefono.
 
 ---
 
-## 2. Prepara Termux
+## 2. Scarica il progetto e installa (un comando)
 
-Apri Termux e digita (una riga alla volta):
-
-```bash
-pkg update && pkg upgrade -y
-pkg install -y python opencv-python git
-pip install flask pyyaml
-termux-setup-storage   # dà a Termux accesso alla memoria (per le ninna nanne)
-```
-
-> **Perché `pkg install opencv-python` e non `pip`?** Su Android `pip install
-> opencv-python` prova a compilare da zero e fallisce. Il pacchetto nativo di
-> Termux (`opencv-python`) è già pronto e include `cv2` e `numpy`.
-> Per questo, sul telefono **NON** usare `pip install -r requirements.txt`
-> (installeresti opencv sbagliato): installa Flask e PyYAML a mano come sopra.
-
----
-
-## 3. Scarica il progetto e configura
+Apri Termux:
 
 ```bash
+pkg install -y git
 git clone <URL-DEL-REPO> Babymonitor
 cd Babymonitor
-cp config.example.yaml config.yaml
-nano config.yaml       # metti IP, utente e stream della camera; salva con CTRL+O, esci con CTRL+X
+bash scripts/install-termux.sh
 ```
 
-Password della camera senza scriverla nel file:
-```bash
-export CAMERA_PASSWORD="la-tua-password"
-```
+L'installer fa **tutto** da solo: installa Python + OpenCV (col pacchetto
+Termux, non con pip), Flask e PyYAML, dà l'accesso alla memoria e prepara
+l'avvio automatico. Non devi modificare nessun file: la **camera si configura
+poi dal wizard** dentro l'app.
 
-Metti le ninna nanne in `~/Babymonitor/lullabies/` (puoi copiarle con un file
-manager nella cartella di Termux, o scaricarle).
+> **Perché non `pip install opencv-python`?** Su Android quella via prova a
+> compilare da zero e fallisce. L'installer usa `pkg install opencv-python`
+> (già pronto). Per lo stesso motivo sul telefono **non** usare
+> `pip install -r requirements.txt`.
 
 ---
 
-## 4. Evita che Android/MIUI lo chiuda (IMPORTANTE)
+## 3. Evita che Android/MIUI lo chiuda (IMPORTANTE)
 
 MIUI chiude le app in background in modo aggressivo. Fai **tutto** questo:
 
@@ -85,15 +70,17 @@ MIUI chiude le app in background in modo aggressivo. Fai **tutto** questo:
 
 ---
 
-## 5. Avvia
+## 4. Avvia
 
 ```bash
+termux-wake-lock
 cd ~/Babymonitor
 python run.py
 ```
 
 Vedrai l'indirizzo, tipo `http://192.168.1.50:8080`. Dall'**iPad/telefono**
-(stessa rete WiFi) apri quell'indirizzo nel browser e "Aggiungi a Home".
+(stessa rete WiFi) apri quell'indirizzo nel browser, segui il **wizard** per
+configurare la camera, poi "Aggiungi a Home".
 
 > Trova l'IP del Mi 9 SE: in Termux `ip addr | grep 'inet '` oppure
 > Impostazioni → WiFi → tocca la rete. Meglio ancora: dal **router** assegna
@@ -101,21 +88,11 @@ Vedrai l'indirizzo, tipo `http://192.168.1.50:8080`. Dall'**iPad/telefono**
 
 ---
 
-## 6. Avvio automatico al riavvio (facoltativo, con Termux:Boot)
+## 5. Avvio automatico al riavvio (facoltativo, con Termux:Boot)
 
-Crea lo script di avvio:
-```bash
-mkdir -p ~/.termux/boot
-cat > ~/.termux/boot/babymonitor.sh <<'EOF'
-#!/data/data/com.termux/files/usr/bin/sh
-termux-wake-lock
-cd ~/Babymonitor
-export CAMERA_PASSWORD="la-tua-password"
-python run.py
-EOF
-chmod +x ~/.termux/boot/babymonitor.sh
-```
-Apri **Termux:Boot** una volta (per abilitarlo). Al riavvio partirà da solo.
+L'installer ha già creato lo script `~/.termux/boot/babymonitor.sh`. Basta
+installare l'app **Termux:Boot** (da F-Droid) e aprirla una volta: al riavvio
+del telefono il baby monitor partirà da solo.
 
 ---
 

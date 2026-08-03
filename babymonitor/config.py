@@ -72,6 +72,11 @@ class Config:
     motion: MotionConfig = field(default_factory=MotionConfig)
     lullaby: LullabyConfig = field(default_factory=LullabyConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
+    # True quando l'utente ha completato il wizard di configurazione.
+    configured: bool = False
+
+    # Percorso del file da cui e' stata caricata (per il salvataggio).
+    _path: str = field(default="config.yaml", repr=False)
 
     @classmethod
     def load(cls, path: str = "config.yaml") -> "Config":
@@ -84,7 +89,9 @@ class Config:
             motion=MotionConfig(**(data.get("motion") or {})),
             lullaby=LullabyConfig(**(data.get("lullaby") or {})),
             server=ServerConfig(**(data.get("server") or {})),
+            configured=bool(data.get("configured", False)),
         )
+        cfg._path = path
         # La password puo' arrivare anche da variabile d'ambiente,
         # cosi' non serve scriverla nel file.
         env_pwd = os.environ.get("CAMERA_PASSWORD")
@@ -93,4 +100,13 @@ class Config:
         return cfg
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        d.pop("_path", None)
+        return d
+
+    def save(self, path: str | None = None) -> None:
+        """Salva la configurazione su file YAML (usato dal wizard)."""
+        target = path or self._path
+        with open(target, "w", encoding="utf-8") as f:
+            yaml.safe_dump(self.to_dict(), f, allow_unicode=True, sort_keys=False)
+        self._path = target

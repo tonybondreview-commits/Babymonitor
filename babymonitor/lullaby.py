@@ -44,6 +44,34 @@ class LullabyLibrary:
             return full
         return None
 
+    def save_upload(self, filename: str, stream) -> dict:
+        """Salva una ninna nanna caricata dal wizard/webapp.
+
+        `stream` e' un oggetto file (es. request.files[...]). Ritorna
+        {"ok": bool, "name"/"error": str}.
+        """
+        safe = os.path.basename(filename or "").strip()
+        if not safe:
+            return {"ok": False, "error": "nome file mancante"}
+        ext = os.path.splitext(safe)[1].lower()
+        if ext not in AUDIO_EXTS:
+            return {"ok": False, "error": f"formato non supportato ({ext or 'nessuno'})"}
+        dest = os.path.join(self.directory, safe)
+        try:
+            stream.save(dest)
+        except AttributeError:
+            with open(dest, "wb") as f:
+                f.write(stream.read())
+        return {"ok": True, "name": safe}
+
+    def delete(self, name: str) -> bool:
+        """Elimina una ninna nanna."""
+        path = self.path_for(name)
+        if not path:
+            return False
+        os.remove(path)
+        return True
+
     # ---- riproduzione sul "cervello" (opzionale) ----------------------
     @staticmethod
     def _find_player() -> list[str] | None:

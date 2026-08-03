@@ -77,39 +77,37 @@ pip install -r requirements.txt
 > Su Raspberry Pi / Debian, se `opencv-python-headless` desse problemi:
 > `sudo apt install python3-opencv` e poi installa il resto.
 
-> 📱 **Usi un vecchio telefono Android (es. Xiaomi Mi 9 SE) come cervello?**
-> Segui la guida dedicata: [`docs/setup-xiaomi-mi9se-termux.md`](docs/setup-xiaomi-mi9se-termux.md)
-> — su Termux OpenCV va installato con `pkg`, non con `pip`.
+> 📱 **Usi un telefono Android (es. Xiaomi Mi 9 SE) come cervello?**
+> Non installare a mano: dopo aver scaricato il progetto in **Termux**, lancia
+> l'installer che fa tutto (dipendenze, wake-lock, avvio automatico):
+> ```bash
+> bash scripts/install-termux.sh
+> ```
+> Guida completa: [`docs/setup-xiaomi-mi9se-termux.md`](docs/setup-xiaomi-mi9se-termux.md).
 
 ---
 
-## ⚙️ 3. Configura
+## ⚙️ 3. Configura — dal WIZARD nell'app (facile!)
 
-```bash
-cp config.example.yaml config.yaml
-```
+**Non serve modificare nessun file.** Avvia l'app (passo 4) e apri l'indirizzo
+dal telefono/iPad: al primo avvio parte un **wizard guidato** che:
 
-Apri `config.yaml` e imposta **IP**, **utente** e **stream** della camera.
-Per la password, il modo più sicuro è **non scriverla nel file** ma passarla
-come variabile d'ambiente:
+1. 🔍 **Cerca la camera** in rete da solo (o inserisci l'IP a mano);
+2. chiede **utente e password**;
+3. 🔌 **prova il collegamento** mostrandoti l'anteprima del video;
+4. 🎚️ ti fa regolare la **sensibilità** dal vivo;
+5. 🎵 ti fa **caricare le ninna nanne** con un tap.
 
-```bash
-export CAMERA_PASSWORD="la-tua-password"
-```
+Puoi riaprirlo quando vuoi con l'icona **⚙️** in alto. La configurazione viene
+salvata da sola in `config.yaml` (che, con i file audio, **non** finisce su git).
 
-(`config.yaml` e i file audio **non** vengono caricati su git.)
-
----
-
-## 🎵 4. Aggiungi le ninna nanne
-
-Metti 4-5 file audio (`.mp3`, `.wav`, `.ogg`, `.m4a`…) nella cartella
-`lullabies/`. Il nome del file diventa il titolo nell'app. Vedi
-`lullabies/README.md`.
+> Utenti esperti: in alternativa potete copiare `config.example.yaml` in
+> `config.yaml` e compilarlo a mano; la password può stare in
+> `export CAMERA_PASSWORD="..."` invece che nel file.
 
 ---
 
-## ▶️ 5. Avvia
+## ▶️ 4. Avvia
 
 ```bash
 python run.py
@@ -166,7 +164,8 @@ Due aiuti pensati per questo uso, già inclusi:
   vibrazione. Tieni lo schermo aperto vicino a te (come un baby monitor).
 - **Ninna nanne**: tocca un brano per farlo partire; attiva **ripeti** per il
   loop. Suonano dall'altoparlante del dispositivo → tieni quel dispositivo
-  vicino alla culla.
+  vicino alla culla. Aggiungi o elimina brani direttamente dall'app
+  (**➕ Aggiungi ninna nanna** / 🗑).
 
 ---
 

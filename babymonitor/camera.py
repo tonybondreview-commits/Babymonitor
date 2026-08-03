@@ -17,6 +17,37 @@ import cv2
 import numpy as np
 
 
+def test_rtsp(url: str, timeout: float = 8.0) -> dict:
+    """Prova ad aprire lo stream RTSP e a leggere un fotogramma.
+
+    Ritorna {"ok": bool, "error": str}. Usato dal wizard per verificare
+    subito se IP/utente/password sono corretti. Il tentativo gira in un
+    thread, cosi' non si blocca se la camera non risponde.
+    """
+    result: dict = {"ok": False, "error": ""}
+
+    def run():
+        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+        try:
+            if not cap.isOpened():
+                result["error"] = "impossibile aprire lo stream"
+                return
+            ok, frame = cap.read()
+            if ok and frame is not None:
+                result["ok"] = True
+            else:
+                result["error"] = "collegato ma nessun video ricevuto"
+        finally:
+            cap.release()
+
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        result["error"] = "timeout: la camera non risponde"
+    return result
+
+
 class Camera:
     def __init__(self, rtsp_url: str, target_width: int = 480, reconnect_delay: float = 3.0):
         self.rtsp_url = rtsp_url
