@@ -16,6 +16,18 @@ def test_build_url_prefers_explicit():
     assert c.build_url() == "rtsp://x/y"
 
 
+def test_host_strips_mistyped_port():
+    # L'utente scrive la porta ONVIF nell'IP: va ignorata (RTSP usa 554).
+    c = CameraConfig(ip="192.168.1.67:5000", username="admin", password="x")
+    assert c.host() == "192.168.1.67"
+    assert c.url_for_path("onvif1") == "rtsp://admin:x@192.168.1.67:554/onvif1"
+
+
+def test_url_for_path_strips_leading_slash():
+    c = CameraConfig(ip="10.0.0.5", username="", password="")
+    assert c.url_for_path("/live/ch0") == "rtsp://10.0.0.5:554/live/ch0"
+
+
 def test_save_and_reload(tmp_path):
     path = os.path.join(tmp_path, "config.yaml")
     cfg = Config()

@@ -129,9 +129,10 @@
       '<div id="wiz-test-result" class="wiz-test"></div>';
     const box = el.querySelector("#wiz-test-result");
 
+    let foundUrl = "";
     const runTest = async () => {
       box.className = "wiz-test wiz-test--wait";
-      box.innerHTML = "⏳ Sto provando a collegarmi alla camera...";
+      box.innerHTML = "⏳ Sto provando a collegarmi alla camera...<br><small>provo i vari percorsi video, può volerci qualche secondo</small>";
       let res;
       try {
         res = await api("api/setup/test", {
@@ -142,8 +143,10 @@
       } catch (e) { res = { ok: false, error: "errore di rete" }; }
 
       if (res.ok) {
+        foundUrl = res.url || "";
         box.className = "wiz-test wiz-test--ok";
-        box.innerHTML = "✅ Collegamento riuscito! La camera funziona.";
+        box.innerHTML = "✅ Collegamento riuscito! La camera funziona." +
+          (res.path ? '<br><small>percorso video: /' + esc(res.path) + "</small>" : "");
         nav(el, { next: () => saveAndNext(), nextLabel: "Perfetto, avanti →" });
       } else {
         box.className = "wiz-test wiz-test--err";
@@ -163,7 +166,7 @@
       await api("api/setup/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cam),
+        body: JSON.stringify(Object.assign({}, cam, { rtsp_url: foundUrl })),
       });
       go(3);
     };

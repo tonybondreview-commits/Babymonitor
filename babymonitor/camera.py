@@ -53,6 +53,49 @@ def split_jpegs(buffer: bytes) -> tuple[list[bytes], bytes]:
     return frames, buffer
 
 
+# Percorsi RTSP piu' comuni sulle camere ONVIF economiche (Fredi/Yoosee e
+# cloni). Il wizard li prova in ordine finche' uno funziona.
+CANDIDATE_PATHS = [
+    "onvif1", "onvif2",
+    "11", "12",
+    "live/ch0", "live/ch1", "live/ch00_0", "live/ch01_0",
+    "media/video1", "media/video2",
+    "h264", "h264_stream", "stream1", "stream2",
+    "cam/realmonitor?channel=1&subtype=0",
+    "cam/realmonitor?channel=1&subtype=1",
+    "ch0_0.h264", "ch0_1.h264",
+    "video1", "1", "0",
+]
+
+# Errori che indicano "camera irraggiungibile": inutile provare altri percorsi.
+_FATAL_HINTS = ("no route to host", "timeout", "refused", "unreachable",
+                "ffmpeg non installato")
+
+
+def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
+    """Trova il percorso RTSP giusto provando i percorsi comuni.
+
+    `cam` e' un CameraConfig. Ritorna {"ok", "url", "path", "error"}.
+    Si ferma subito se la camera e' proprio irraggiungibile (IP sbagliato).
+    """
+    if getattr(cam, "rtsp_url", ""):
+        r = test_rtsp(cam.rtsp_url, timeout=timeout_each + 3)
+        return {"ok": r["ok"], "url": cam.rtsp_url if r["ok"] else "",
+                "path": "", "error": r.get("error", "")}
+
+    last_err = ""
+    for path in CANDIDATE_PATHS:
+        url = cam.url_for_path(path)
+        r = test_rtsp(url, timeout=timeout_each)
+        if r["ok"]:
+            return {"ok": True, "url": url, "path": path, "error": ""}
+        last_err = r.get("error", "")
+        if any(k in last_err.lower() for k in _FATAL_HINTS):
+            return {"ok": False, "url": "", "path": "", "error": last_err}
+    return {"ok": False, "url": "", "path": "",
+            "error": last_err or "nessun percorso video valido trovato"}
+
+
 def test_rtsp(url: str, timeout: float = 12.0) -> dict:
     """Prova a leggere un fotogramma dallo stream RTSP.
 

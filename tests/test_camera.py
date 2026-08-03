@@ -8,8 +8,10 @@ import io
 
 import numpy as np
 
-from babymonitor.camera import Camera, split_jpegs
+from babymonitor import camera as cammod
+from babymonitor.camera import Camera, split_jpegs, probe_rtsp
 from babymonitor.camera import test_rtsp as check_rtsp
+from babymonitor.config import CameraConfig
 from PIL import Image
 
 
@@ -57,3 +59,38 @@ def test_test_rtsp_no_ffmpeg(monkeypatch):
     monkeypatch.setattr("babymonitor.camera._ffmpeg_bin", lambda: "ffmpeg-inesistente-xyz")
     res = check_rtsp("rtsp://fake", timeout=3)
     assert res["ok"] is False
+
+
+def test_probe_finds_working_path(monkeypatch):
+    # Simula che solo /onvif2 risponda: la sonda deve trovarlo.
+    def fake(url, timeout=6.0):
+        ok = url.endswith("/onvif2")
+        return {"ok": ok, "error": "" if ok else "404 Not Found"}
+    monkeypatch.setattr(cammod, "test_rtsp", fake)
+    cam = CameraConfig(ip="192.168.1.67", username="admin", password="x")
+    res = probe_rtsp(cam, timeout_each=0.01)
+    assert res["ok"] is True
+    assert res["path"] == "onvif2"
+    assert res["url"].endswith("192.168.1.67:554/onvif2")
+
+
+def test_probe_stops_when_unreachable(monkeypatch):
+    calls = []
+    def fake(url, timeout=6.0):
+        calls.append(url)
+        return {"ok": False, "error": "No route to host"}
+    monkeypatch.setattr(cammod, "test_rtsp", fake)
+    cam = CameraConfig(ip="10.0.0.9", username="admin", password="x")
+    res = probe_rtsp(cam, timeout_each=0.01)
+    assert res["ok"] is False
+    assert len(calls) == 1  # non prova tutti i percorsi se l'IP e' irraggiungibile
+
+
+def test_probe_uses_explicit_url(monkeypatch):
+    def fake(url, timeout=6.0):
+        return {"ok": True, "error": ""}
+    monkeypatch.setattr(cammod, "test_rtsp", fake)
+    cam = CameraConfig(rtsp_url="rtsp://admin:x@1.2.3.4:554/custom")
+    res = probe_rtsp(cam)
+    assert res["ok"] is True
+    assert res["url"] == "rtsp://admin:x@1.2.3.4:554/custom"

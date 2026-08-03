@@ -32,15 +32,30 @@ class CameraConfig:
     # "sub" e' consigliato per l'analisi: meno banda, stessa efficacia.
     stream: str = "sub"
 
+    def host(self) -> str:
+        """Solo l'indirizzo, senza eventuale porta digitata per errore.
+
+        Se l'utente scrive "192.168.1.67:5000" (la porta ONVIF), la porta va
+        ignorata: per RTSP usiamo self.rtsp_port (554).
+        """
+        h = self.ip.strip().split("/")[0]
+        if h.count(":") == 1:  # host:porta (non IPv6)
+            h = h.split(":")[0]
+        return h
+
+    def url_for_path(self, path: str) -> str:
+        """Costruisce l'URL RTSP per un percorso specifico."""
+        user = quote(self.username, safe="")
+        pwd = quote(self.password, safe="")
+        auth = f"{user}:{pwd}@" if self.username else ""
+        return f"rtsp://{auth}{self.host()}:{self.rtsp_port}/{path.lstrip('/')}"
+
     def build_url(self) -> str:
         """Costruisce l'URL RTSP completo."""
         if self.rtsp_url:
             return self.rtsp_url
         path = YOOSEE_RTSP_PATHS.get(self.stream, YOOSEE_RTSP_PATHS["sub"])
-        user = quote(self.username, safe="")
-        pwd = quote(self.password, safe="")
-        auth = f"{user}:{pwd}@" if self.username else ""
-        return f"rtsp://{auth}{self.ip}:{self.rtsp_port}/{path}"
+        return self.url_for_path(path)
 
 
 @dataclass

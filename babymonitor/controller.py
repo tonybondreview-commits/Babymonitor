@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 
-from .camera import Camera, test_rtsp
+from .camera import Camera, probe_rtsp
 from .config import CameraConfig, Config
 from .discovery import discover_cameras
 from .events import EventBus
@@ -59,7 +59,8 @@ class Controller:
 
     @staticmethod
     def test_camera(cam: CameraConfig) -> dict:
-        return test_rtsp(cam.build_url())
+        # Prova automaticamente i percorsi RTSP comuni.
+        return probe_rtsp(cam)
 
     def apply_camera(self, values: dict) -> dict:
         """Applica i nuovi dati della camera, salva e riavvia lo stream."""
@@ -70,7 +71,16 @@ class Controller:
         if "password" in values:
             cam.password = str(values.get("password") or "")
         cam.stream = str(values.get("stream", cam.stream) or "sub")
-        cam.rtsp_url = str(values.get("rtsp_url", cam.rtsp_url) or "")
+
+        # Se il wizard ha gia' trovato l'URL funzionante lo usiamo; altrimenti
+        # lo cerchiamo ora provando i percorsi comuni.
+        provided = str(values.get("rtsp_url", "") or "")
+        if provided:
+            cam.rtsp_url = provided
+        else:
+            cam.rtsp_url = ""  # azzera per poter sondare da capo
+            found = probe_rtsp(cam)
+            cam.rtsp_url = found.get("url", "") or ""
         self.config.configured = True
 
         with self._lock:
