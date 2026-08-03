@@ -77,6 +77,10 @@ pip install -r requirements.txt
 > Su Raspberry Pi / Debian, se `opencv-python-headless` desse problemi:
 > `sudo apt install python3-opencv` e poi installa il resto.
 
+> 📱 **Usi un vecchio telefono Android (es. Xiaomi Mi 9 SE) come cervello?**
+> Segui la guida dedicata: [`docs/setup-xiaomi-mi9se-termux.md`](docs/setup-xiaomi-mi9se-termux.md)
+> — su Termux OpenCV va installato con `pkg`, non con `pip`.
+
 ---
 
 ## ⚙️ 3. Configura
