@@ -31,6 +31,9 @@ class CameraConfig:
     rtsp_url: str = ""
     # "sub" e' consigliato per l'analisi: meno banda, stessa efficacia.
     stream: str = "sub"
+    # Trasporto RTSP: "tcp" o "udp" (alcune camere accettano solo UDP).
+    # Il wizard lo determina da solo durante la prova di collegamento.
+    rtsp_transport: str = "tcp"
 
     def host(self) -> str:
         """Solo l'indirizzo, senza eventuale porta digitata per errore.

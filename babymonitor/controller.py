@@ -30,7 +30,8 @@ class Controller:
 
     # ---- costruzione / avvio ------------------------------------------
     def _build(self) -> None:
-        self.camera = Camera(self.config.camera.build_url())
+        self.camera = Camera(self.config.camera.build_url(),
+                             transport=self.config.camera.rtsp_transport)
         self.monitor = Monitor(self.config, self.camera, self.bus)
 
     def start(self) -> None:
@@ -72,15 +73,20 @@ class Controller:
             cam.password = str(values.get("password") or "")
         cam.stream = str(values.get("stream", cam.stream) or "sub")
 
-        # Se il wizard ha gia' trovato l'URL funzionante lo usiamo; altrimenti
-        # lo cerchiamo ora provando i percorsi comuni.
+        # Se il wizard ha gia' trovato l'URL/trasporto funzionante li usiamo;
+        # altrimenti li cerchiamo ora.
         provided = str(values.get("rtsp_url", "") or "")
         if provided:
             cam.rtsp_url = provided
+            t = str(values.get("rtsp_transport", "") or "")
+            if t in ("tcp", "udp"):
+                cam.rtsp_transport = t
         else:
             cam.rtsp_url = ""  # azzera per poter sondare da capo
             found = probe_rtsp(cam)
             cam.rtsp_url = found.get("url", "") or ""
+            if found.get("transport") in ("tcp", "udp"):
+                cam.rtsp_transport = found["transport"]
         self.config.configured = True
 
         with self._lock:

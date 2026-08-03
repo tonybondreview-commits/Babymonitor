@@ -81,56 +81,60 @@ def _is_auth_error(err: str) -> bool:
     return "401" in e or "unauthorized" in e
 
 
-def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
-    """Trova l'URL RTSP giusto provando i percorsi comuni, con e senza
-    credenziali (alcune camere le vogliono, altre no).
+TRANSPORTS = ("tcp", "udp")  # alcune camere accettano solo UDP
 
-    `cam` e' un CameraConfig. Ritorna {"ok", "url", "path", "error"}.
-    Si ferma subito se la camera e' irraggiungibile o se un percorso esiste
-    ma rifiuta l'autenticazione in entrambe le varianti.
+
+def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
+    """Trova la combinazione RTSP che funziona provando: percorsi comuni ×
+    trasporto (TCP/UDP) × con o senza credenziali.
+
+    `cam` e' un CameraConfig. Ritorna {"ok", "url", "path", "transport", "error"}.
+    Si ferma subito se la camera e' irraggiungibile.
     """
     if getattr(cam, "rtsp_url", ""):
-        r = test_rtsp(cam.rtsp_url, timeout=timeout_each + 3)
-        return {"ok": r["ok"], "url": cam.rtsp_url if r["ok"] else "",
-                "path": "", "error": r.get("error", "")}
+        for transport in TRANSPORTS:
+            r = test_rtsp(cam.rtsp_url, timeout=timeout_each + 3, transport=transport)
+            if r["ok"]:
+                return {"ok": True, "url": cam.rtsp_url, "path": "",
+                        "transport": transport, "error": ""}
+            if _is_net_error(r.get("error", "")):
+                break
+        return {"ok": False, "url": "", "path": "", "transport": "",
+                "error": r.get("error", "")}
 
     last_err = ""
+    saw_auth = False
     for path in CANDIDATE_PATHS:
-        # 1) prova CON credenziali
-        url = cam.url_for_path(path, with_credentials=True)
-        r = test_rtsp(url, timeout=timeout_each)
-        if r["ok"]:
-            return {"ok": True, "url": url, "path": path, "error": ""}
-        last_err = r.get("error", "")
-        if _is_net_error(last_err):
-            return {"ok": False, "url": "", "path": "", "error": last_err}
-
-        if _is_auth_error(last_err):
-            # Il percorso esiste ma serve/rifiuta l'auth: prova SENZA credenziali.
-            url2 = cam.url_for_path(path, with_credentials=False)
-            r2 = test_rtsp(url2, timeout=timeout_each)
-            if r2["ok"]:
-                return {"ok": True, "url": url2, "path": path, "error": ""}
-            err2 = r2.get("error", "")
-            if _is_net_error(err2):
-                return {"ok": False, "url": "", "path": "", "error": err2}
-            if _is_auth_error(err2):
-                # Entrambe rifiutate: il percorso c'e' ma le credenziali no.
-                return {"ok": False, "url": "", "path": "",
-                        "error": "utente/password rifiutati dalla camera"}
-        # altrimenti (404 / percorso inesistente): passa al prossimo
-    return {"ok": False, "url": "", "path": "",
+        for transport in TRANSPORTS:
+            for with_creds in (True, False):
+                url = cam.url_for_path(path, with_credentials=with_creds)
+                r = test_rtsp(url, timeout=timeout_each, transport=transport)
+                if r["ok"]:
+                    return {"ok": True, "url": url, "path": path,
+                            "transport": transport, "error": ""}
+                err = r.get("error", "")
+                last_err = err
+                if _is_net_error(err):
+                    return {"ok": False, "url": "", "path": "",
+                            "transport": "", "error": err}
+                if _is_auth_error(err):
+                    saw_auth = True
+                    continue          # riprova senza credenziali, stesso trasporto
+                break                 # 404 / trasporto errato: passa al trasporto dopo
+    if saw_auth and _is_auth_error(last_err):
+        last_err = "utente/password rifiutati dalla camera"
+    return {"ok": False, "url": "", "path": "", "transport": "",
             "error": last_err or "nessun percorso video valido trovato"}
 
 
-def test_rtsp(url: str, timeout: float = 12.0) -> dict:
+def test_rtsp(url: str, timeout: float = 12.0, transport: str = "tcp") -> dict:
     """Prova a leggere un fotogramma dallo stream RTSP.
 
-    Ritorna {"ok": bool, "error": str}. Usato dal wizard per verificare
-    subito se IP/utente/password sono corretti.
+    `transport` e' "tcp" o "udp": alcune camere accettano solo uno dei due.
+    Ritorna {"ok": bool, "error": str}.
     """
     cmd = [
-        _ffmpeg_bin(), "-nostdin", "-rtsp_transport", "tcp", "-i", url,
+        _ffmpeg_bin(), "-nostdin", "-rtsp_transport", transport, "-i", url,
         "-an", "-frames:v", "1", "-f", "mjpeg", "pipe:1", "-loglevel", "error",
     ]
     try:
@@ -146,9 +150,10 @@ def test_rtsp(url: str, timeout: float = 12.0) -> dict:
 
 
 class Camera:
-    def __init__(self, rtsp_url: str, target_width: int = 480, motion_width: int = 320,
-                 fps: int = 8, reconnect_delay: float = 3.0):
+    def __init__(self, rtsp_url: str, transport: str = "tcp", target_width: int = 480,
+                 motion_width: int = 320, fps: int = 8, reconnect_delay: float = 3.0):
         self.rtsp_url = rtsp_url
+        self.transport = transport if transport in TRANSPORTS else "tcp"
         self.target_width = target_width      # larghezza del video mostrato
         self.motion_width = motion_width      # larghezza usata per l'analisi
         self.fps = fps
@@ -213,7 +218,7 @@ class Camera:
     # ---- thread interno ------------------------------------------------
     def _spawn(self) -> subprocess.Popen:
         cmd = [
-            _ffmpeg_bin(), "-nostdin", "-rtsp_transport", "tcp",
+            _ffmpeg_bin(), "-nostdin", "-rtsp_transport", self.transport,
             "-fflags", "nobuffer",
             "-i", self.rtsp_url, "-an",
             "-vf", f"fps={self.fps},scale={self.target_width}:-1",
