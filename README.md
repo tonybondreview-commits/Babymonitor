@@ -118,7 +118,9 @@ Vedrai qualcosa come:
 [baby-monitor] Apri dal telefono/iPad:  http://<ip-di-questo-dispositivo>:8080
 ```
 
-Sul telefono/iPad (**stessa rete WiFi**) apri il browser e vai a:
+Il terminale mostra anche un **QR code**: inquadralo con la fotocamera
+dell'iPad/telefono per aprire l'app senza digitare nulla. In alternativa, sul
+telefono/iPad (**stessa rete WiFi**) apri il browser e vai a:
 ```
 http://IP-DEL-CERVELLO:8080
 ```

@@ -22,9 +22,9 @@ echo "==> Installo Python, OpenCV e git..."
 # IMPORTANTE: su Android OpenCV si installa col pacchetto di Termux, NON con pip.
 pkg install -y python opencv-python git
 
-echo "==> Installo Flask e PyYAML..."
+echo "==> Installo Flask, PyYAML e qrcode..."
 pip install --upgrade pip >/dev/null 2>&1 || true
-pip install flask pyyaml
+pip install flask pyyaml qrcode
 
 echo "==> Permesso di accesso alla memoria (per le ninna nanne)..."
 termux-setup-storage || true

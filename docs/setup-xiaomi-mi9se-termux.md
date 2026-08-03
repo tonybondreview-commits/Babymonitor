@@ -1,11 +1,13 @@
-# 🧠 Usare uno Xiaomi Mi 9 SE (o altro Android) come "cervello"
+# 🧠 Usare un telefono Android come "cervello" (Xiaomi, Pixel, ecc.)
 
-Il Mi 9 SE è perfetto come dispositivo sempre acceso che legge il video della
-camera, rileva il movimento e serve la webapp. Gira dentro **Termux** (un
-terminale Linux per Android). Tutto resta offline, sulla rete di casa.
+Un telefono Android sempre acceso (es. **Xiaomi Mi 9 SE** o **Google Pixel**)
+è perfetto per leggere il video della camera, rilevare il movimento e servire
+la webapp. Gira dentro **Termux** (un terminale Linux per Android). Tutto
+resta offline, sulla rete di casa.
 
 > ⚠️ Due punti delicati, spiegati sotto: **OpenCV su Termux** (si installa con
-> `pkg`, non con `pip`) e le **impostazioni MIUI** per non farlo chiudere.
+> `pkg`, non con `pip`) e le **impostazioni anti-chiusura** (poche su Pixel,
+> più numerose su Xiaomi/MIUI).
 
 ---
 
@@ -45,9 +47,16 @@ poi dal wizard** dentro l'app.
 
 ---
 
-## 3. Evita che Android/MIUI lo chiuda (IMPORTANTE)
+## 3. Evita che Android lo chiuda (IMPORTANTE)
 
-MIUI chiude le app in background in modo aggressivo. Fai **tutto** questo:
+> 📱 **Hai un Google Pixel (Android "stock", es. Pixel 9a/10a)?** È più facile:
+> non c'è l'Autostart di MIUI. Ti basta: **Impostazioni → App → Termux →
+> Batteria → "Senza restrizioni"** (o "Illimitato"), tenere Termux aperto in
+> un riquadro dei recenti, e fare `termux-wake-lock`. Salta i passi specifici
+> di Xiaomi qui sotto.
+
+Su Xiaomi/MIUI, che chiude le app in background in modo aggressivo, fai
+**tutto** questo:
 
 1. **Wake-lock di Termux** — impedisce alla CPU di addormentarsi.
    In Termux digita:

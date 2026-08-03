@@ -15,8 +15,10 @@ import argparse
 import signal
 import sys
 
+from babymonitor import qr as qrgen
 from babymonitor.config import Config
 from babymonitor.controller import Controller
+from babymonitor.netinfo import app_url
 from babymonitor.server import create_app
 
 
@@ -44,7 +46,14 @@ def main() -> int:
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    print(f"[baby-monitor] Apri dal telefono/iPad:  http://<ip-di-questo-dispositivo>:{config.server.port}")
+    url = app_url(config.server.port)
+    print("\n[baby-monitor] Apri questo indirizzo dall'iPad/telefono (stessa rete WiFi):")
+    print(f"    {url}\n")
+    if qrgen.HAS_QR:
+        print("Oppure inquadra questo QR code con la fotocamera:\n")
+        print(qrgen.ascii_qr(url))
+        print()
+
     app.run(host=config.server.host, port=config.server.port, threaded=True)
     return 0
 

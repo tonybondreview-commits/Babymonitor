@@ -17,6 +17,7 @@
     <div class="brand">👶 Baby Monitor</div>
     <div class="topbar-right">
       <div id="status-pill" class="pill pill--off">Connessione…</div>
+      <button id="qr-btn" class="icon-btn" title="Apri su un altro dispositivo" aria-label="QR">📱</button>
       <button id="settings-btn" class="icon-btn" title="Configura camera" aria-label="Configura">⚙️</button>
     </div>
   </header>
@@ -72,6 +73,17 @@
       <div class="alert-title">Il bimbo si è mosso!</div>
       <div id="alert-time" class="alert-time"></div>
       <button id="alert-dismiss" class="btn btn--primary">Ho capito</button>
+    </div>
+  </div>
+
+  <!-- Finestra QR: apri l'app su un altro dispositivo -->
+  <div id="qr-modal" class="alert-overlay hidden" role="dialog">
+    <div class="alert-box">
+      <div class="alert-title">📱 Apri su un altro dispositivo</div>
+      <p class="hint">Inquadra il QR con la fotocamera, sulla stessa rete WiFi.</p>
+      <div id="qr-holder" class="qr-holder"></div>
+      <div id="qr-url" class="qr-url"></div>
+      <button id="qr-close" class="btn btn--primary">Chiudi</button>
     </div>
   </div>
 

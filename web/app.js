@@ -208,6 +208,23 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
+  // Pulsante QR: mostra l'indirizzo per aprire l'app su un altro dispositivo.
+  const qrBtn = $("qr-btn");
+  const qrModal = $("qr-modal");
+  async function showQr() {
+    const holder = $("qr-holder");
+    const urlBox = $("qr-url");
+    holder.innerHTML = '<img src="qr.svg?' + Date.now() + '" alt="QR" onerror="this.style.display=\'none\'">';
+    try {
+      const info = await (await fetch("api/url")).json();
+      urlBox.textContent = info.url || "";
+      if (!info.qr) holder.innerHTML = '<p class="hint">Installa il modulo <code>qrcode</code> per il QR.</p>';
+    } catch (e) { urlBox.textContent = ""; }
+    qrModal.classList.remove("hidden");
+  }
+  if (qrBtn) qrBtn.onclick = showQr;
+  if ($("qr-close")) $("qr-close").onclick = () => qrModal.classList.add("hidden");
+
   function playLullaby(item, btn) {
     player.src = "lullabies/" + encodeURIComponent(item.name);
     player.loop = loopToggle.checked;

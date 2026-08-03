@@ -231,4 +231,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .wiz-test--err { background: rgba(255,90,106,.12); color: var(--danger); }
 .wiz-test small { font-weight: 400; }
 
+/* QR code */
+.qr-holder {
+  display: flex; justify-content: center; margin: 14px 0 8px;
+}
+.qr-holder img {
+  width: 220px; max-width: 70vw; height: auto;
+  background: #fff; padding: 10px; border-radius: 12px;
+}
+.qr-url {
+  text-align: center; color: var(--muted); font-size: 0.9rem;
+  word-break: break-all; margin-bottom: 14px;
+}
+
 .hidden { display: none !important; }

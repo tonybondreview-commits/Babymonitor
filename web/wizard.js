@@ -222,7 +222,14 @@
       '<div class="wiz-emoji">🎉</div>' +
       '<h2>Tutto pronto!</h2>' +
       '<p>Il baby monitor è configurato. Tieni la webapp aperta per ricevere ' +
-      'i popup quando il bimbo si muove.</p>';
+      'i popup quando il bimbo si muove.</p>' +
+      '<p class="wiz-or">Aprilo su un altro dispositivo (es. iPad): inquadra il QR</p>' +
+      '<div class="qr-holder"><img src="qr.svg?' + Date.now() + '" alt="QR" ' +
+      'onerror="this.parentNode.style.display=\'none\'"></div>' +
+      '<div id="wiz-url" class="qr-url"></div>';
+    api("api/url").then((i) => {
+      const u = el.querySelector("#wiz-url"); if (u) u.textContent = i.url || "";
+    }).catch(() => {});
     const done = document.createElement("button");
     done.className = "btn btn--primary wiz-full";
     done.textContent = "Apri il monitor";

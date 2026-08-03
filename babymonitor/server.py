@@ -19,8 +19,10 @@ from flask import (
     send_from_directory,
 )
 
+from . import qr as qrgen
 from .config import CameraConfig
 from .controller import Controller
+from .netinfo import app_url
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")
 
@@ -80,6 +82,19 @@ def create_app(controller: Controller) -> Flask:
 
         return Response(stream_events(), mimetype="text/event-stream",
                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    # ---- indirizzo + QR per aprire su un altro dispositivo ------------
+    @app.route("/api/url")
+    def api_url():
+        url = app_url(controller.config.server.port)
+        return jsonify({"url": url, "qr": qrgen.HAS_QR})
+
+    @app.route("/qr.svg")
+    def qr_svg():
+        if not qrgen.HAS_QR:
+            return jsonify({"error": "modulo qrcode non installato"}), 404
+        url = app_url(controller.config.server.port)
+        return Response(qrgen.svg(url), mimetype="image/svg+xml")
 
     # ---- stato e comandi movimento ------------------------------------
     @app.route("/api/status")
