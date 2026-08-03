@@ -43,11 +43,17 @@ class CameraConfig:
             h = h.split(":")[0]
         return h
 
-    def url_for_path(self, path: str) -> str:
-        """Costruisce l'URL RTSP per un percorso specifico."""
-        user = quote(self.username, safe="")
-        pwd = quote(self.password, safe="")
-        auth = f"{user}:{pwd}@" if self.username else ""
+    def url_for_path(self, path: str, with_credentials: bool = True) -> str:
+        """Costruisce l'URL RTSP per un percorso specifico.
+
+        Alcune camere vogliono le credenziali nell'URL, altre no: il wizard
+        prova entrambe le varianti (with_credentials True/False).
+        """
+        auth = ""
+        if with_credentials and self.username:
+            user = quote(self.username, safe="")
+            pwd = quote(self.password, safe="")
+            auth = f"{user}:{pwd}@"
         return f"rtsp://{auth}{self.host()}:{self.rtsp_port}/{path.lstrip('/')}"
 
     def build_url(self) -> str:

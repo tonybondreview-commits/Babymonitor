@@ -86,6 +86,31 @@ def test_probe_stops_when_unreachable(monkeypatch):
     assert len(calls) == 1  # non prova tutti i percorsi se l'IP e' irraggiungibile
 
 
+def test_probe_falls_back_without_credentials(monkeypatch):
+    # Camera che rifiuta le credenziali (401) ma funziona senza.
+    def fake(url, timeout=6.0):
+        if "@" in url:
+            return {"ok": False, "error": "401 Unauthorized"}
+        return {"ok": url.endswith("/onvif1"), "error": ""}
+    monkeypatch.setattr(cammod, "test_rtsp", fake)
+    cam = CameraConfig(ip="192.168.1.67", username="admin", password="x")
+    res = probe_rtsp(cam, timeout_each=0.01)
+    assert res["ok"] is True
+    assert "@" not in res["url"]        # variante senza credenziali
+    assert res["path"] == "onvif1"
+
+
+def test_probe_both_auth_fail(monkeypatch):
+    # Sia con che senza credenziali danno 401: credenziali rifiutate.
+    def fake(url, timeout=6.0):
+        return {"ok": False, "error": "401 Unauthorized"}
+    monkeypatch.setattr(cammod, "test_rtsp", fake)
+    cam = CameraConfig(ip="192.168.1.67", username="admin", password="x")
+    res = probe_rtsp(cam, timeout_each=0.01)
+    assert res["ok"] is False
+    assert "rifiutat" in res["error"].lower()
+
+
 def test_probe_uses_explicit_url(monkeypatch):
     def fake(url, timeout=6.0):
         return {"ok": True, "error": ""}

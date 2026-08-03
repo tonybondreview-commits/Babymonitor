@@ -67,17 +67,27 @@ CANDIDATE_PATHS = [
     "video1", "1", "0",
 ]
 
-# Errori per cui e' inutile provare altri percorsi: camera irraggiungibile
-# (IP sbagliato) o autenticazione fallita (password sbagliata).
-_FATAL_HINTS = ("no route to host", "timeout", "refused", "unreachable",
-                "ffmpeg non installato", "401", "unauthorized")
+# Errori che indicano "camera irraggiungibile": inutile insistere.
+_NET_HINTS = ("no route to host", "timeout", "refused", "unreachable",
+              "ffmpeg non installato")
+
+
+def _is_net_error(err: str) -> bool:
+    return any(k in err.lower() for k in _NET_HINTS)
+
+
+def _is_auth_error(err: str) -> bool:
+    e = err.lower()
+    return "401" in e or "unauthorized" in e
 
 
 def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
-    """Trova il percorso RTSP giusto provando i percorsi comuni.
+    """Trova l'URL RTSP giusto provando i percorsi comuni, con e senza
+    credenziali (alcune camere le vogliono, altre no).
 
     `cam` e' un CameraConfig. Ritorna {"ok", "url", "path", "error"}.
-    Si ferma subito se la camera e' proprio irraggiungibile (IP sbagliato).
+    Si ferma subito se la camera e' irraggiungibile o se un percorso esiste
+    ma rifiuta l'autenticazione in entrambe le varianti.
     """
     if getattr(cam, "rtsp_url", ""):
         r = test_rtsp(cam.rtsp_url, timeout=timeout_each + 3)
@@ -86,16 +96,29 @@ def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
 
     last_err = ""
     for path in CANDIDATE_PATHS:
-        url = cam.url_for_path(path)
+        # 1) prova CON credenziali
+        url = cam.url_for_path(path, with_credentials=True)
         r = test_rtsp(url, timeout=timeout_each)
         if r["ok"]:
             return {"ok": True, "url": url, "path": path, "error": ""}
         last_err = r.get("error", "")
-        low = last_err.lower()
-        if any(k in low for k in _FATAL_HINTS):
-            if "401" in low or "unauthorized" in low:
-                last_err = "password (o utente) probabilmente errata"
+        if _is_net_error(last_err):
             return {"ok": False, "url": "", "path": "", "error": last_err}
+
+        if _is_auth_error(last_err):
+            # Il percorso esiste ma serve/rifiuta l'auth: prova SENZA credenziali.
+            url2 = cam.url_for_path(path, with_credentials=False)
+            r2 = test_rtsp(url2, timeout=timeout_each)
+            if r2["ok"]:
+                return {"ok": True, "url": url2, "path": path, "error": ""}
+            err2 = r2.get("error", "")
+            if _is_net_error(err2):
+                return {"ok": False, "url": "", "path": "", "error": err2}
+            if _is_auth_error(err2):
+                # Entrambe rifiutate: il percorso c'e' ma le credenziali no.
+                return {"ok": False, "url": "", "path": "",
+                        "error": "utente/password rifiutati dalla camera"}
+        # altrimenti (404 / percorso inesistente): passa al prossimo
     return {"ok": False, "url": "", "path": "",
             "error": last_err or "nessun percorso video valido trovato"}
 
