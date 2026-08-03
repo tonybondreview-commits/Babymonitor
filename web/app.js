@@ -59,14 +59,31 @@
 
   // ---- schermo intero (stile player) ---------------------------------
   const fsBtn = $("fs-btn");
+  function enterFs(gesture) {
+    videoCard.classList.add("fs");
+    document.body.classList.add("fs-open");
+    if (fsBtn) fsBtn.textContent = "✕";
+    // Android: se e' un tocco, prova a bloccare in orizzontale (iOS lo ignora).
+    if (gesture) {
+      try {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(() => {});
+        }
+      } catch (e) { /* iOS non lo supporta */ }
+    }
+  }
+  function exitFs() {
+    videoCard.classList.remove("fs");
+    document.body.classList.remove("fs-open");
+    if (fsBtn) fsBtn.textContent = "⛶";
+    try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+  }
   function toggleFs() {
-    const on = videoCard.classList.toggle("fs");
-    document.body.classList.toggle("fs-open", on);
-    if (fsBtn) fsBtn.textContent = on ? "✕" : "⛶";
+    if (videoCard.classList.contains("fs")) exitFs(); else enterFs(true);
   }
   if (fsBtn) fsBtn.onclick = toggleFs;
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && videoCard.classList.contains("fs")) toggleFs();
+    if (e.key === "Escape" && videoCard.classList.contains("fs")) exitFs();
   });
 
   // ---- tieni lo schermo acceso mentre fai da monitor ------------------
@@ -303,8 +320,13 @@
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
-  // Al primo avvio (camera non configurata) parte il wizard guidato.
-  if (window.BabyWizard) window.BabyWizard.maybeStart();
+  // Al primo avvio parte il wizard; se la camera e' gia' configurata, apri
+  // subito il video a schermo pieno (stile monitor).
+  (async () => {
+    let wizardShown = false;
+    if (window.BabyWizard) wizardShown = await window.BabyWizard.maybeStart();
+    if (!wizardShown) setTimeout(() => enterFs(false), 400);
+  })();
 
   keepScreenAwake();
   connectEvents();
