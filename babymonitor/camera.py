@@ -67,9 +67,10 @@ CANDIDATE_PATHS = [
     "video1", "1", "0",
 ]
 
-# Errori che indicano "camera irraggiungibile": inutile provare altri percorsi.
+# Errori per cui e' inutile provare altri percorsi: camera irraggiungibile
+# (IP sbagliato) o autenticazione fallita (password sbagliata).
 _FATAL_HINTS = ("no route to host", "timeout", "refused", "unreachable",
-                "ffmpeg non installato")
+                "ffmpeg non installato", "401", "unauthorized")
 
 
 def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
@@ -90,7 +91,10 @@ def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
         if r["ok"]:
             return {"ok": True, "url": url, "path": path, "error": ""}
         last_err = r.get("error", "")
-        if any(k in last_err.lower() for k in _FATAL_HINTS):
+        low = last_err.lower()
+        if any(k in low for k in _FATAL_HINTS):
+            if "401" in low or "unauthorized" in low:
+                last_err = "password (o utente) probabilmente errata"
             return {"ok": False, "url": "", "path": "", "error": last_err}
     return {"ok": False, "url": "", "path": "",
             "error": last_err or "nessun percorso video valido trovato"}
