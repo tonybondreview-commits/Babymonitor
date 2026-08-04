@@ -273,13 +273,25 @@
   const uploadInput = $("lullaby-upload");
   if (uploadInput) {
     uploadInput.onchange = async (ev) => {
-      for (const f of ev.target.files) {
-        const fd = new FormData();
-        fd.append("file", f);
-        await fetch("api/lullabies/upload", { method: "POST", body: fd }).catch(() => {});
+      const files = ev.target.files;
+      if (!files || !files.length) return;
+      let ok = 0, fail = 0, lastErr = "";
+      for (const f of files) {
+        try {
+          const fd = new FormData();
+          fd.append("file", f);
+          const r = await fetch("api/lullabies/upload", { method: "POST", body: fd });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j.ok) ok++; else { fail++; lastErr = j.error || ("errore " + r.status); }
+        } catch (e) { fail++; lastErr = "errore di rete"; }
       }
       uploadInput.value = "";
       loadLullabies();
+      if (fail) {
+        alert("Caricate: " + ok + " · non riuscite: " + fail +
+              (lastErr ? "\n(" + lastErr + ")" : "") +
+              "\nFormati ammessi: mp3, m4a, wav, aac, ogg, flac.");
+      }
     };
   }
 
@@ -294,15 +306,17 @@
   const audioBtn = $("audio-btn");   // stesso comando, sovrapposto al video
   const camAudio = $("cam-audio");
   let listening = false;
+  function startCamAudio() {
+    camAudio.muted = false;
+    camAudio.volume = 1;
+    camAudio.src = "hls/audio.m3u8?" + Date.now();
+    camAudio.load();
+    camAudio.play().catch(() => {});   // chiamata nel gesto: sblocca iOS
+  }
   function setListening(on) {
     listening = on;
     if (on) {
-      camAudio.muted = false;
-      camAudio.volume = 1;
-      // HLS: riprodotto nativamente da Safari/iPad. Su altri browser, se
-      // fallisce, si passa in automatico all'MP3 (vedi onerror sotto).
-      camAudio.src = "hls/audio.m3u8?" + Date.now();
-      camAudio.play().catch((e) => { console.log("audio play:", e); });
+      startCamAudio();
     } else {
       camAudio.pause();
       camAudio.removeAttribute("src");
@@ -321,13 +335,13 @@
     // Mostriamo sempre il tasto: se la camera non avesse audio, resta muto.
     if (listenBtn) { listenBtn.onclick = () => setListening(!listening); listenBtn.classList.remove("hidden"); }
     if (audioBtn) { audioBtn.onclick = () => setListening(!listening); audioBtn.classList.remove("hidden"); }
-    // Fallback: se l'HLS non parte (es. Chrome Android), prova l'MP3.
-    camAudio.onerror = () => {
-      if (listening && camAudio.src.indexOf("audio.mp3") < 0) {
-        camAudio.src = "audio.mp3?" + Date.now();
-        camAudio.play().catch(() => {});
-      }
-    };
+    // L'HLS impiega 2-4s a preparare i primi segmenti: appena e' pronto, parte.
+    camAudio.addEventListener("canplay", () => { if (listening) camAudio.play().catch(() => {}); });
+    camAudio.addEventListener("loadeddata", () => { if (listening) camAudio.play().catch(() => {}); });
+    // Se c'e' un intoppo, riprova l'HLS (non l'MP3, che su Safari non va).
+    camAudio.addEventListener("error", () => {
+      if (listening) setTimeout(() => { if (listening) startCamAudio(); }, 1500);
+    });
   }
 
   // ---- PTZ (muovi la camera) -----------------------------------------
