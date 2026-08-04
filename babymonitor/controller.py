@@ -138,6 +138,11 @@ class Controller:
             self._audio_available = has_audio(cam.build_url(), cam.rtsp_transport)
         return self._audio_available
 
+    def restart_camera(self) -> None:
+        """Riavvia il collegamento alla camera (refresh dello stream)."""
+        if self.camera:
+            self.camera.restart()
+
     def set_quality(self, quality: str) -> bool:
         """Cambia la qualità video e riavvia lo stream."""
         if quality not in QUALITY_PRESETS:

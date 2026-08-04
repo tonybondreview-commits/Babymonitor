@@ -107,6 +107,11 @@ def create_app(controller: Controller) -> Flask:
         st["quality"] = controller.config.camera.video_quality
         return jsonify(st)
 
+    @app.route("/api/camera/restart", methods=["POST"])
+    def api_camera_restart():
+        controller.restart_camera()
+        return jsonify({"ok": True})
+
     @app.route("/api/quality", methods=["POST"])
     def api_quality():
         data = request.get_json(silent=True) or {}

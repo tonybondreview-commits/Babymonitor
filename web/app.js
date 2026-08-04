@@ -61,6 +61,17 @@
     }
   }
 
+  // ---- aggiorna la camera (refresh dello stream) ---------------------
+  const refreshBtn = $("refresh-btn");
+  if (refreshBtn) {
+    refreshBtn.onclick = async () => {
+      refreshBtn.classList.add("spin");
+      try { await fetch("api/camera/restart", { method: "POST" }); } catch (e) { /* ignora */ }
+      reloadVideo();
+      setTimeout(() => { reloadVideo(); refreshBtn.classList.remove("spin"); }, 3500);
+    };
+  }
+
   // ---- schermo intero (stile player) ---------------------------------
   const fsBtn = $("fs-btn");
   function enterFs(gesture) {

@@ -212,6 +212,15 @@ class Camera:
                     pass
         self._proc = None
 
+    def restart(self) -> None:
+        """Chiude il processo ffmpeg corrente: il loop lo rilancia da solo."""
+        p = self._proc
+        if p and p.poll() is None:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+
     @property
     def connected(self) -> bool:
         return self._connected
