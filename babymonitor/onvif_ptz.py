@@ -31,8 +31,10 @@ _NS_MEDIA = "http://www.onvif.org/ver10/media/wsdl"
 _NS_PTZ = "http://www.onvif.org/ver20/ptz/wsdl"
 _NS_SCHEMA = "http://www.onvif.org/ver10/schema"
 
-_ENV = ('<?xml version="1.0" encoding="UTF-8"?>'
-        '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">{header}<s:Body>{body}</s:Body></s:Envelope>')
+_ENV12 = ('<?xml version="1.0" encoding="UTF-8"?>'
+          '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">{header}<s:Body>{body}</s:Body></s:Envelope>')
+_ENV11 = ('<?xml version="1.0" encoding="UTF-8"?>'
+          '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">{header}<s:Body>{body}</s:Body></s:Envelope>')
 
 # Opener che NON usa proxy (le richieste vanno alla camera in rete locale).
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -56,12 +58,8 @@ def _security(user: str, password: str) -> str:
     ).format(u=user, d=digest, n=n64, c=created)
 
 
-def _post(url: str, body: str, user: str, password: str, action: str = "", timeout: float = 6.0) -> str:
-    envelope = _ENV.format(header=_security(user, password), body=body).encode("utf-8")
-    ct = "application/soap+xml; charset=utf-8"
-    if action:
-        ct += '; action="%s"' % action
-    req = urllib.request.Request(url, data=envelope, headers={"Content-Type": ct}, method="POST")
+def _http(url: str, envelope: str, headers: dict, timeout: float) -> str:
+    req = urllib.request.Request(url, data=envelope.encode("utf-8"), headers=headers, method="POST")
     try:
         with _OPENER.open(req, timeout=timeout) as r:
             return r.read().decode("utf-8", "ignore")
@@ -72,6 +70,29 @@ def _post(url: str, body: str, user: str, password: str, action: str = "", timeo
             return ""
     except Exception:
         return ""
+
+
+def _looks_ok(resp: str) -> bool:
+    if not resp:
+        return False
+    low = resp.lower()
+    return not any(k in low for k in ("fault", "versionmismatch", "actionnotsupported"))
+
+
+def _post(url: str, body: str, user: str, password: str, action: str = "", timeout: float = 6.0) -> str:
+    """Invia una richiesta SOAP provando prima 1.2 e, se non va, 1.1."""
+    header = _security(user, password)
+    # SOAP 1.2
+    ct = "application/soap+xml; charset=utf-8"
+    if action:
+        ct += '; action="%s"' % action
+    resp = _http(url, _ENV12.format(header=header, body=body), {"Content-Type": ct}, timeout)
+    if _looks_ok(resp):
+        return resp
+    # SOAP 1.1 (fallback)
+    headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"%s"' % action}
+    resp11 = _http(url, _ENV11.format(header=header, body=body), headers, timeout)
+    return resp11 or resp
 
 
 # ---- corpi SOAP -----------------------------------------------------------
@@ -159,16 +180,20 @@ class PtzController:
             if not token:
                 return False
             self.token = token
-            if not has_ptz:
-                return False
-            # Trova l'endpoint PTZ che risponde a uno Stop (comando innocuo).
+            # Trova l'endpoint PTZ che risponde davvero a uno Stop (comando
+            # innocuo): se risponde con StopResponse, la camera ha il PTZ.
             for path in PTZ_PATHS:
                 url = self._base() + path
                 resp = _post(url, _b_stop(token), self.user, self.password, action=_NS_PTZ + "/Stop")
-                if "StopResponse" in resp or "Envelope" in resp:
+                if "StopResponse" in resp:
                     self.ptz_url = url
                     self.available = True
                     break
+            # Se nessun endpoint risponde ma il profilo dichiara il PTZ, provalo
+            # comunque sull'endpoint piu' comune.
+            if not self.available and has_ptz:
+                self.ptz_url = self._base() + PTZ_PATHS[0]
+                self.available = True
             return self.available
 
     def is_available(self) -> bool:

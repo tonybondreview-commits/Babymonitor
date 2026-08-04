@@ -22,8 +22,12 @@
   const videoCard = $("video-card");
 
   // ---- video live -----------------------------------------------------
-  video.src = "stream.mjpg";
-  video.onerror = () => setTimeout(() => { video.src = "stream.mjpg?" + Date.now(); }, 3000);
+  function reloadVideo() { video.src = "stream.mjpg?" + Date.now(); }
+  reloadVideo();
+  video.onerror = () => setTimeout(reloadVideo, 3000);
+  // Quando torni sull'app (o la riapri), lo stream MJPEG puo' essere caduto:
+  // lo ricarichiamo cosi' rivedi il video senza dover aggiornare a mano.
+  window.addEventListener("pageshow", reloadVideo);
 
   // ---- suono d'allarme (file audio: affidabile anche su iPhone) -------
   let soundOn = true;
@@ -98,7 +102,7 @@
     } catch (e) { /* alcuni browser lo negano finche' non tocchi lo schermo */ }
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") keepScreenAwake();
+    if (document.visibilityState === "visible") { keepScreenAwake(); reloadVideo(); }
   });
 
   // Notifica del browser sul nuovo movimento (utile se sei su un'altra scheda).

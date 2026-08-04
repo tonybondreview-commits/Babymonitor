@@ -36,11 +36,38 @@ def has_audio(url: str, transport: str = "tcp", timeout: float = 10.0) -> bool:
     return bool(p.stdout.strip())
 
 
+_ENCODER: str | None = None
+
+
+def _has_encoder(name: str) -> bool:
+    try:
+        p = subprocess.run([_ffmpeg(), "-hide_banner", "-encoders"],
+                           capture_output=True, timeout=10)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+    return name.encode() in (p.stdout or b"")
+
+
+def pick_encoder() -> str:
+    """Sceglie 'mp3' se ffmpeg ha libmp3lame, altrimenti 'aac' (sempre presente)."""
+    global _ENCODER
+    if _ENCODER is None:
+        _ENCODER = "mp3" if _has_encoder("libmp3lame") else "aac"
+    return _ENCODER
+
+
+def audio_mime() -> str:
+    return "audio/mpeg" if pick_encoder() == "mp3" else "audio/aac"
+
+
 def audio_command(url: str, transport: str = "tcp") -> list[str]:
-    """Comando ffmpeg: RTSP -> MP3 in streaming continuo (solo audio)."""
+    """Comando ffmpeg: RTSP -> audio in streaming continuo (solo audio)."""
+    if pick_encoder() == "mp3":
+        codec = ["-c:a", "libmp3lame", "-b:a", "48k", "-f", "mp3"]
+    else:
+        codec = ["-c:a", "aac", "-b:a", "64k", "-f", "adts"]
     return [
         _ffmpeg(), "-nostdin", "-rtsp_transport", transport,
         "-fflags", "nobuffer", "-i", url,
-        "-vn", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "48k",
-        "-f", "mp3", "pipe:1", "-loglevel", "error",
+        "-vn", "-ac", "1", *codec, "pipe:1", "-loglevel", "error",
     ]

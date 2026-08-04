@@ -22,7 +22,7 @@ from flask import (
 import subprocess
 
 from . import qr as qrgen
-from .audio import audio_command
+from .audio import audio_command, audio_mime
 from .config import CameraConfig
 from .controller import Controller
 from .netinfo import app_url
@@ -186,7 +186,7 @@ def create_app(controller: Controller) -> Flask:
                         except Exception:
                             pass
 
-        return Response(generate(), mimetype="audio/mpeg")
+        return Response(generate(), mimetype=audio_mime())
 
     # ---- PTZ (movimento camera) ---------------------------------------
     @app.route("/api/ptz/available")
