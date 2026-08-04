@@ -1,0 +1,33 @@
+name: baby_monitor
+description: Baby monitor nativo per camere ONVIF/RTSP (Fredi/Yoosee) - senza cervello.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Decoder video/audio integrato (libVLC): riproduce RTSP direttamente,
+  # cosi' il telefono fa tutto da solo, senza un dispositivo tramite.
+  flutter_vlc_player: ^7.4.1
+  # ONVIF (PTZ) e snapshot via HTTP + digest auth
+  http: ^1.2.0
+  crypto: ^3.0.3
+  xml: ^6.5.0
+  # Rilevamento movimento: confronto tra fotogrammi (snapshot del video)
+  image: ^4.1.7
+  # Riproduzione ninna nanne sul dispositivo
+  audioplayers: ^6.0.0
+  # Salvataggio configurazione + feedback
+  shared_preferences: ^2.2.3
+  wakelock_plus: ^1.2.5
+  vibration: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/beep.wav
+    - assets/lullabies/
