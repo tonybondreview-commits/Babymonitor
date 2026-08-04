@@ -234,10 +234,13 @@ class Camera:
     def _spawn(self) -> subprocess.Popen:
         cmd = [
             _ffmpeg_bin(), "-nostdin", "-rtsp_transport", self.transport,
-            "-fflags", "nobuffer",
+            # Bassa latenza: niente buffer in ingresso, invio immediato dei
+            # fotogrammi in uscita.
+            "-fflags", "nobuffer", "-flags", "low_delay", "-avioflags", "direct",
             "-i", self.rtsp_url, "-an",
             "-vf", f"fps={self.fps},scale={self.target_width}:-1",
-            "-f", "mjpeg", "-q:v", str(self.jpeg_q), "pipe:1", "-loglevel", "error",
+            "-q:v", str(self.jpeg_q), "-flush_packets", "1",
+            "-f", "mjpeg", "pipe:1", "-loglevel", "error",
         ]
         return subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, bufsize=0)
