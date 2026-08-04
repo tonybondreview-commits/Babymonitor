@@ -107,7 +107,12 @@
 
     <section class="card lullabies">
       <div class="card-head"><h2>🎵 Ninna nanne</h2></div>
-      <p class="hint">Suonano da <em>questo</em> dispositivo: tienilo vicino alla culla.</p>
+      <div class="field-head" style="margin-bottom:2px"><strong>Riproduci su</strong></div>
+      <div class="seg" id="lullaby-target">
+        <button data-t="device" class="active">📱 Dispositivo</button>
+        <button data-t="camera">📷 Telecamera</button>
+      </div>
+      <p class="hint" id="lullaby-hint">Suonano da <em>questo</em> dispositivo: tienilo vicino alla culla.</p>
       <div id="lullaby-list" class="lullaby-list"></div>
       <label class="btn btn--add" for="lullaby-upload">➕ Aggiungi ninna nanna</label>
       <input type="file" id="lullaby-upload" accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,audio/*" multiple hidden>

@@ -8,6 +8,7 @@ from __future__ import annotations
 import threading
 import time
 
+from .backchannel import Backchannel
 from .camera import Camera, probe_rtsp, quality_preset, test_rtsp, QUALITY_PRESETS
 from .config import CameraConfig, Config
 from .discovery import find_cameras, scan_subnet
@@ -33,6 +34,7 @@ class Controller:
         self._lock = threading.Lock()
         self._health: threading.Thread | None = None
         self._running_health = False
+        self._bc: Backchannel | None = None
         self.hls = HlsAudio(lambda: self.config.camera.build_url(),
                             lambda: self.config.camera.rtsp_transport)
         self._build()
@@ -216,6 +218,25 @@ class Controller:
                 pass
             self._rebuild_streams()
         return True
+
+    # ---- invio audio alla camera (backchannel, sperimentale) ----------
+    def play_to_camera(self, name: str) -> dict:
+        path = self.library.path_for(name)
+        if not path:
+            return {"ok": False, "error": "ninna nanna non trovata"}
+        self.stop_to_camera()
+        self._bc = Backchannel(self.config.camera.build_url())
+
+        def run():
+            result = self._bc.send_file(path)
+            self.bus.publish("backchannel", result)
+
+        threading.Thread(target=run, name="backchannel", daemon=True).start()
+        return {"ok": True, "started": True}
+
+    def stop_to_camera(self) -> None:
+        if self._bc:
+            self._bc.stop()
 
     def apply_motion(self, values: dict) -> dict:
         m = self.config.motion

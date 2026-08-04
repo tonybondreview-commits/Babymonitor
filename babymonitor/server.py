@@ -261,6 +261,16 @@ def create_app(controller: Controller) -> Flask:
         return (jsonify({"ok": True}) if library.delete(name)
                 else (jsonify({"ok": False, "error": "file non trovato"}), 404))
 
+    @app.route("/api/lullabies/to-camera", methods=["POST"])
+    def api_to_camera():
+        data = request.get_json(silent=True) or {}
+        return jsonify(controller.play_to_camera(str(data.get("name", ""))))
+
+    @app.route("/api/lullabies/to-camera/stop", methods=["POST"])
+    def api_to_camera_stop():
+        controller.stop_to_camera()
+        return jsonify({"ok": True})
+
     @app.route("/api/lullabies/play-local", methods=["POST"])
     def api_play_local():
         data = request.get_json(silent=True) or {}

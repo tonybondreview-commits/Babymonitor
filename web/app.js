@@ -205,6 +205,15 @@
       } else if (msg.type === "motion") {
         motionCount.textContent = (msg.data.count || 0) + " rilevamenti";
         if (motionToggle.checked) notifyMotion();
+      } else if (msg.type === "backchannel") {
+        // esito dell'invio audio alla telecamera (sperimentale)
+        const d = msg.data || {};
+        nowPlaying.classList.add("hidden");
+        if (currentBtn) { currentBtn.classList.remove("playing"); currentBtn = null; }
+        if (!d.ok) {
+          alert("Invio alla telecamera non riuscito:\n" + (d.error || "sconosciuto") +
+                "\n\nIl backchannel è sperimentale: la tua camera potrebbe non accettarlo.");
+        }
       }
     };
     es.onerror = () => {
@@ -422,7 +431,36 @@
   if (qrBtn) qrBtn.onclick = showQr;
   if ($("qr-close")) $("qr-close").onclick = () => qrModal.classList.add("hidden");
 
+  // Dove riprodurre le ninna nanne: "device" (questo dispositivo) o "camera".
+  let lullabyTarget = "device";
+  const lullabyTargetSeg = $("lullaby-target");
+  const lullabyHint = $("lullaby-hint");
+  if (lullabyTargetSeg) {
+    lullabyTargetSeg.querySelectorAll("button").forEach((b) => {
+      b.onclick = () => {
+        lullabyTarget = b.dataset.t;
+        lullabyTargetSeg.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+        if (lullabyHint) {
+          lullabyHint.innerHTML = lullabyTarget === "camera"
+            ? "Suonano dall'<em>altoparlante della telecamera</em> (sperimentale)."
+            : "Suonano da <em>questo</em> dispositivo: tienilo vicino alla culla.";
+        }
+      };
+    });
+  }
+
   function playLullaby(item, btn) {
+    if (lullabyTarget === "camera") {
+      npTitle.textContent = "Invio alla telecamera: " + item.title + " …";
+      nowPlaying.classList.remove("hidden");
+      if (currentBtn) currentBtn.classList.remove("playing");
+      currentBtn = btn; btn.classList.add("playing");
+      fetch("api/lullabies/to-camera", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: item.name }),
+      }).catch(() => {});
+      return;
+    }
     player.src = "lullabies/" + encodeURIComponent(item.name);
     player.loop = loopToggle.checked;
     player.play().catch(() => {});
@@ -437,6 +475,7 @@
   $("stop-btn").onclick = () => {
     player.pause();
     player.currentTime = 0;
+    fetch("api/lullabies/to-camera/stop", { method: "POST" }).catch(() => {});
     nowPlaying.classList.add("hidden");
     if (currentBtn) currentBtn.classList.remove("playing");
     currentBtn = null;
