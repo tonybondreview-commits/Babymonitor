@@ -27,6 +27,7 @@ class Controller:
         self.camera: Camera | None = None
         self.monitor: Monitor | None = None
         self.ptz: PtzController | None = None
+        self._audio_available: bool | None = None
         self._lock = threading.Lock()
         self._build()
 
@@ -37,6 +38,7 @@ class Controller:
         self.monitor = Monitor(self.config, self.camera, self.bus)
         c = self.config.camera
         self.ptz = PtzController(c.host(), c.username, c.password, c.onvif_port)
+        self._audio_available = None  # ricontrolla la presenza audio
 
     def start(self) -> None:
         self.camera.start()
@@ -116,6 +118,14 @@ class Controller:
 
     def ptz_command(self, action: str) -> bool:
         return bool(self.ptz and self.ptz.move(action))
+
+    # ---- audio dalla camera -------------------------------------------
+    def audio_available(self) -> bool:
+        if self._audio_available is None:
+            from .audio import has_audio
+            cam = self.config.camera
+            self._audio_available = has_audio(cam.build_url(), cam.rtsp_transport)
+        return self._audio_available
 
     def apply_motion(self, values: dict) -> dict:
         m = self.config.motion

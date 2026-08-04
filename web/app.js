@@ -248,6 +248,31 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
+  // ---- ascolta l'audio della camera (senti il bimbo) -----------------
+  const listenBtn = $("listen-btn");
+  const camAudio = $("cam-audio");
+  let listening = false;
+  if (listenBtn && camAudio) {
+    listenBtn.onclick = () => {
+      listening = !listening;
+      if (listening) {
+        camAudio.src = "audio.mp3?" + Date.now();
+        camAudio.play().catch(() => {});
+        listenBtn.textContent = "🔇 Ascolto attivo — tocca per fermare";
+        listenBtn.classList.add("on");
+      } else {
+        camAudio.pause();
+        camAudio.removeAttribute("src");
+        camAudio.load();
+        listenBtn.textContent = "🔊 Ascolta l'audio della camera";
+        listenBtn.classList.remove("on");
+      }
+    };
+    fetch("api/audio/available").then((r) => r.json()).then((j) => {
+      if (j.available) listenBtn.classList.remove("hidden");
+    }).catch(() => {});
+  }
+
   // ---- PTZ (muovi la camera) -----------------------------------------
   const ptzToggle = $("ptz-toggle");
   const ptzPad = $("ptz-pad");

@@ -252,6 +252,7 @@ input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 
 .btn--soft { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
 .btn--block { width: 100%; }
 .btn--add { display: block; text-align: center; background: var(--surface-2); color: var(--text); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.btn--soft.on { background: linear-gradient(135deg, var(--accent), #6ad3ae); color: #fff; border-color: transparent; }
 
 /* ---- landscape ----------------------------------------------------- */
 @media (orientation: landscape) and (min-width: 680px) {

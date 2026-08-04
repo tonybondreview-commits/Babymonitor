@@ -19,7 +19,10 @@ from flask import (
     send_from_directory,
 )
 
+import subprocess
+
 from . import qr as qrgen
+from .audio import audio_command
 from .config import CameraConfig
 from .controller import Controller
 from .netinfo import app_url
@@ -149,6 +152,41 @@ def create_app(controller: Controller) -> Flask:
         except (TypeError, ValueError) as e:
             return jsonify({"ok": False, "error": str(e)}), 400
         return jsonify({"ok": True})
+
+    # ---- audio dalla camera (senti il bimbo) --------------------------
+    @app.route("/api/audio/available")
+    def audio_available():
+        return jsonify({"available": controller.audio_available()})
+
+    @app.route("/audio.mp3")
+    def audio_stream():
+        cam = controller.config.camera
+        cmd = audio_command(cam.build_url(), cam.rtsp_transport)
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, bufsize=0)
+        except FileNotFoundError:
+            return jsonify({"error": "ffmpeg non installato"}), 500
+
+        def generate():
+            try:
+                while True:
+                    chunk = proc.stdout.read(4096)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.poll() is None:
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=2)
+                    except Exception:
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+
+        return Response(generate(), mimetype="audio/mpeg")
 
     # ---- PTZ (movimento camera) ---------------------------------------
     @app.route("/api/ptz/available")
