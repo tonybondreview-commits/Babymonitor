@@ -260,8 +260,10 @@
   function setListening(on) {
     listening = on;
     if (on) {
+      camAudio.muted = false;
+      camAudio.volume = 1;
       camAudio.src = "audio.mp3?" + Date.now();
-      camAudio.play().catch(() => {});
+      camAudio.play().catch((e) => { console.log("audio play:", e); });
     } else {
       camAudio.pause();
       camAudio.removeAttribute("src");

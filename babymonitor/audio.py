@@ -63,11 +63,14 @@ def audio_mime() -> str:
 def audio_command(url: str, transport: str = "tcp") -> list[str]:
     """Comando ffmpeg: RTSP -> audio in streaming continuo (solo audio)."""
     if pick_encoder() == "mp3":
-        codec = ["-c:a", "libmp3lame", "-b:a", "48k", "-f", "mp3"]
+        # write_xing 0 + niente id3: header adatti a uno stream "dal vivo"
+        # (senza durata) che Safari riproduce subito.
+        codec = ["-c:a", "libmp3lame", "-b:a", "48k",
+                 "-write_xing", "0", "-id3v2_version", "0", "-f", "mp3"]
     else:
         codec = ["-c:a", "aac", "-b:a", "64k", "-f", "adts"]
     return [
         _ffmpeg(), "-nostdin", "-rtsp_transport", transport,
         "-fflags", "nobuffer", "-i", url,
-        "-vn", "-ac", "1", *codec, "pipe:1", "-loglevel", "error",
+        "-vn", "-ac", "1", "-flush_packets", "1", *codec, "pipe:1", "-loglevel", "error",
     ]

@@ -186,7 +186,11 @@ def create_app(controller: Controller) -> Flask:
                         except Exception:
                             pass
 
-        return Response(generate(), mimetype=audio_mime())
+        # 200 + niente range: Safari lo riproduce come stream "dal vivo".
+        return Response(generate(), status=200, mimetype=audio_mime(),
+                        direct_passthrough=True,
+                        headers={"Cache-Control": "no-cache, no-store",
+                                 "Accept-Ranges": "none", "Connection": "close"})
 
     # ---- PTZ (movimento camera) ---------------------------------------
     @app.route("/api/ptz/available")
