@@ -284,7 +284,9 @@
     if (on) {
       camAudio.muted = false;
       camAudio.volume = 1;
-      camAudio.src = "audio.mp3?" + Date.now();
+      // HLS: riprodotto nativamente da Safari/iPad. Su altri browser, se
+      // fallisce, si passa in automatico all'MP3 (vedi onerror sotto).
+      camAudio.src = "hls/audio.m3u8?" + Date.now();
       camAudio.play().catch((e) => { console.log("audio play:", e); });
     } else {
       camAudio.pause();
@@ -304,6 +306,13 @@
     // Mostriamo sempre il tasto: se la camera non avesse audio, resta muto.
     if (listenBtn) { listenBtn.onclick = () => setListening(!listening); listenBtn.classList.remove("hidden"); }
     if (audioBtn) { audioBtn.onclick = () => setListening(!listening); audioBtn.classList.remove("hidden"); }
+    // Fallback: se l'HLS non parte (es. Chrome Android), prova l'MP3.
+    camAudio.onerror = () => {
+      if (listening && camAudio.src.indexOf("audio.mp3") < 0) {
+        camAudio.src = "audio.mp3?" + Date.now();
+        camAudio.play().catch(() => {});
+      }
+    };
   }
 
   // ---- PTZ (muovi la camera) -----------------------------------------

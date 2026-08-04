@@ -11,6 +11,7 @@ from .camera import Camera, probe_rtsp, quality_preset, QUALITY_PRESETS
 from .config import CameraConfig, Config
 from .discovery import find_cameras
 from .events import EventBus
+from .hls_audio import HlsAudio
 from .lullaby import LullabyLibrary
 from .monitor import Monitor
 from .onvif_ptz import PtzController
@@ -29,6 +30,8 @@ class Controller:
         self.ptz: PtzController | None = None
         self._audio_available: bool | None = None
         self._lock = threading.Lock()
+        self.hls = HlsAudio(lambda: self.config.camera.build_url(),
+                            lambda: self.config.camera.rtsp_transport)
         self._build()
 
     # ---- costruzione / avvio ------------------------------------------

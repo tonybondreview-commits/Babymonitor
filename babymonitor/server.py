@@ -200,6 +200,25 @@ def create_app(controller: Controller) -> Flask:
                         headers={"Cache-Control": "no-cache, no-store",
                                  "Accept-Ranges": "none", "Connection": "close"})
 
+    # Audio in HLS (per iPad/Safari, che lo riproduce sempre).
+    @app.route("/hls/audio.m3u8")
+    def hls_playlist():
+        controller.hls.ensure()
+        path = controller.hls.wait_for_playlist(timeout=6)
+        if not path:
+            return jsonify({"error": "audio non pronto"}), 503
+        resp = send_file(path, mimetype="application/vnd.apple.mpegurl")
+        resp.headers["Cache-Control"] = "no-cache, no-store"
+        return resp
+
+    @app.route("/hls/<path:name>")
+    def hls_segment(name):
+        controller.hls.touch()
+        path = controller.hls.file(name)
+        if not path:
+            return jsonify({"error": "segmento non trovato"}), 404
+        return send_file(path, mimetype="video/mp2t")
+
     # ---- PTZ (movimento camera) ---------------------------------------
     @app.route("/api/ptz/available")
     def ptz_available():
