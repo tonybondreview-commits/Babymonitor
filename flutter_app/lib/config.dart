@@ -8,7 +8,9 @@ class CameraConfig {
   int onvifPort;
   String username;
   String password;
-  String path; // percorso RTSP, es. "onvif1"
+  String path; // percorso RTSP alta qualita', es. "onvif1"
+  String subPath; // percorso RTSP bassa qualita' (sotto-stream), es. "onvif2"
+  bool lowQuality; // usa il sotto-stream (piu' leggero)
   int sensitivity; // 1..100
   bool motionEnabled;
   bool soundEnabled;
@@ -20,6 +22,8 @@ class CameraConfig {
     this.username = 'admin',
     this.password = '',
     this.path = 'onvif1',
+    this.subPath = 'onvif2',
+    this.lowQuality = false,
     this.sensitivity = 55,
     this.motionEnabled = true,
     this.soundEnabled = true,
@@ -27,12 +31,14 @@ class CameraConfig {
 
   bool get isConfigured => ip.isNotEmpty;
 
+  String get activePath => lowQuality ? subPath : path;
+
   /// URL RTSP completo (con credenziali).
   String get rtspUrl {
     final auth = username.isNotEmpty
         ? '${Uri.encodeComponent(username)}:${Uri.encodeComponent(password)}@'
         : '';
-    return 'rtsp://$auth$ip:$rtspPort/$path';
+    return 'rtsp://$auth$ip:$rtspPort/$activePath';
   }
 
   Map<String, dynamic> toJson() => {
@@ -42,6 +48,8 @@ class CameraConfig {
         'username': username,
         'password': password,
         'path': path,
+        'subPath': subPath,
+        'lowQuality': lowQuality,
         'sensitivity': sensitivity,
         'motionEnabled': motionEnabled,
         'soundEnabled': soundEnabled,
@@ -54,6 +62,8 @@ class CameraConfig {
         username: j['username'] ?? 'admin',
         password: j['password'] ?? '',
         path: j['path'] ?? 'onvif1',
+        subPath: j['subPath'] ?? 'onvif2',
+        lowQuality: j['lowQuality'] ?? false,
         sensitivity: j['sensitivity'] ?? 55,
         motionEnabled: j['motionEnabled'] ?? true,
         soundEnabled: j['soundEnabled'] ?? true,

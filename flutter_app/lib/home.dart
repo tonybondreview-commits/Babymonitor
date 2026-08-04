@@ -68,6 +68,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _suggestPath;
   bool _diagRunning = false;
 
+  bool _fullscreen = false;
+
   @override
   void initState() {
     super.initState();
@@ -277,6 +279,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {});
   }
 
+  Future<void> _toggleQuality() async {
+    widget.config.lowQuality = !widget.config.lowQuality;
+    await widget.config.save();
+    setState(() {});
+    await _refresh();
+  }
+
+  Future<void> _enterFullscreen() async {
+    setState(() => _fullscreen = true);
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _exitFullscreen() async {
+    setState(() => _fullscreen = false);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    // riabilita la rotazione libera poco dopo
+    Future.delayed(const Duration(milliseconds: 600), () {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    });
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -292,6 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _watchdog?.cancel();
     for (final s in _subs) {
       s.cancel();
@@ -365,6 +394,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 fontWeight: FontWeight.w700, fontSize: 16, color: _ink),
           ),
           const Spacer(),
+          _roundIcon(
+            widget.config.lowQuality ? Icons.sd_rounded : Icons.hd_rounded,
+            _toggleQuality,
+          ),
+          _roundIcon(Icons.fullscreen_rounded, _enterFullscreen),
           _roundIcon(_night ? Icons.dark_mode : Icons.light_mode, _toggleNight),
           _roundIcon(Icons.settings_rounded, _openSettings),
         ],
@@ -387,7 +421,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(children: [
-                _glassIcon(_listening ? Icons.volume_up : Icons.volume_off,
+                _glassIcon(Icons.fullscreen_exit_rounded, _exitFullscreen),
+                const SizedBox(height: 10),
+                _glassIcon(
+                    _listening ? Icons.volume_up : Icons.volume_off,
                     _toggleListen,
                     active: _listening),
                 const SizedBox(height: 10),
@@ -397,6 +434,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         : Icons.sensors_off,
                     _toggleMotion,
                     active: widget.config.motionEnabled),
+                const SizedBox(height: 10),
+                _glassIcon(
+                    widget.config.lowQuality ? Icons.sd_rounded : Icons.hd_rounded,
+                    _toggleQuality),
                 const SizedBox(height: 10),
                 _glassIcon(Icons.refresh_rounded, _refresh),
                 const SizedBox(height: 10),
@@ -464,7 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   String get _address =>
-      '${widget.config.ip}:${widget.config.rtspPort}/${widget.config.path}';
+      '${widget.config.ip}:${widget.config.rtspPort}/${widget.config.activePath}';
 
   String _errorDetail() {
     final e = (_errText ?? '').trim();
@@ -837,16 +878,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _glassIcon(IconData ic, VoidCallback onTap, {bool active = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: active ? kMint : Colors.black.withOpacity(0.4),
-          shape: BoxShape.circle,
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: active ? kMint : Colors.black.withOpacity(0.45),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Icon(ic, color: Colors.white, size: 24),
         ),
-        child: Icon(ic, color: Colors.white, size: 24),
       ),
     );
   }
