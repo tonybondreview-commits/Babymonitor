@@ -258,7 +258,7 @@
         row.className = "lullaby-row";
         const btn = document.createElement("button");
         btn.className = "lullaby-item";
-        btn.innerHTML = '<span class="ico">🎵</span><span>' + escapeHtml(item.title) + "</span>";
+        btn.innerHTML = '<span class="ico">▶</span><span>' + escapeHtml(item.title) + "</span>";
         btn.onclick = () => playLullaby(item, btn);
         const del = document.createElement("button");
         del.className = "lullaby-del";
