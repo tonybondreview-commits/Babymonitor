@@ -358,12 +358,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       children: [
         _topBar(),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
             child: _videoCard(),
           ),
         ),
+        const Spacer(),
         _controlDock(),
         const SizedBox(height: 8),
       ],
