@@ -70,30 +70,28 @@ workflows:
           # sia in Kotlin (build.gradle.kts).
           if [ -f android/build.gradle.kts ]; then
             cat >> android/build.gradle.kts <<'EOF'
-
-subprojects {
-    afterEvaluate {
-        if (extensions.findByName("android") != null) {
-            extensions.configure<com.android.build.gradle.BaseExtension>("android") {
-                compileSdkVersion(36)
-            }
-        }
-    }
-}
-EOF
+          subprojects {
+              afterEvaluate {
+                  if (extensions.findByName("android") != null) {
+                      extensions.configure<com.android.build.gradle.BaseExtension>("android") {
+                          compileSdkVersion(36)
+                      }
+                  }
+              }
+          }
+          EOF
           else
             cat >> android/build.gradle <<'EOF'
-
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty("android")) {
-            project.android {
-                compileSdkVersion 36
-            }
-        }
-    }
-}
-EOF
+          subprojects {
+              afterEvaluate { project ->
+                  if (project.hasProperty("android")) {
+                      project.android {
+                          compileSdkVersion 36
+                      }
+                  }
+              }
+          }
+          EOF
           fi
       - name: Scarica le dipendenze
         script: flutter pub get
