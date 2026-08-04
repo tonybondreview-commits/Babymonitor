@@ -9,10 +9,14 @@ Non richiede internet: tutto avviene sulla rete di casa.
 
 from __future__ import annotations
 
+import concurrent.futures
+import ipaddress
 import re
 import socket
 import time
 import uuid
+
+from .netinfo import get_lan_ip
 
 WSD_ADDR = "239.255.255.250"
 WSD_PORT = 3702
@@ -77,3 +81,52 @@ def discover_cameras(timeout: float = 3.0) -> list[str]:
 def extract_ips(text: str) -> list[str]:
     """Estrae gli IP dagli XAddrs (esposta per i test)."""
     return _IP_RE.findall(text)
+
+
+def _sort_ips(ips) -> list[str]:
+    def key(s):
+        try:
+            return tuple(int(x) for x in s.split("."))
+        except ValueError:
+            return (999,)
+    return sorted(set(ips), key=key)
+
+
+def scan_subnet(port: int = 554, timeout: float = 0.5, max_workers: int = 100) -> list[str]:
+    """Cerca sulla rete locale gli host con la porta RTSP (554) aperta.
+
+    Non usa il multicast (che Android blocca): prova un collegamento diretto a
+    ogni indirizzo della sottorete /24. Piu' lento del WS-Discovery ma molto
+    piu' affidabile per trovare la camera.
+    """
+    ip = get_lan_ip()
+    try:
+        net = ipaddress.ip_network(ip + "/24", strict=False)
+    except ValueError:
+        return []
+
+    def check(host: str) -> str | None:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            rc = s.connect_ex((host, port))
+        except OSError:
+            rc = 1
+        finally:
+            s.close()
+        return host if rc == 0 else None
+
+    hosts = [str(h) for h in net.hosts()]
+    found: list[str] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for res in ex.map(check, hosts):
+            if res:
+                found.append(res)
+    return _sort_ips(found)
+
+
+def find_cameras() -> list[str]:
+    """Trova le camere: prima via ONVIF (veloce), poi via scansione porta RTSP."""
+    cams = discover_cameras()
+    extra = scan_subnet(554)
+    return _sort_ips(list(cams) + list(extra))

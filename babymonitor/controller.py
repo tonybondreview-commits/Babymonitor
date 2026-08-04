@@ -9,7 +9,7 @@ import threading
 
 from .camera import Camera, probe_rtsp
 from .config import CameraConfig, Config
-from .discovery import discover_cameras
+from .discovery import find_cameras
 from .events import EventBus
 from .lullaby import LullabyLibrary
 from .monitor import Monitor
@@ -56,7 +56,7 @@ class Controller:
     # ---- operazioni del wizard ----------------------------------------
     @staticmethod
     def discover() -> list[str]:
-        return discover_cameras()
+        return find_cameras()
 
     @staticmethod
     def test_camera(cam: CameraConfig) -> dict:

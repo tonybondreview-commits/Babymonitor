@@ -15,3 +15,16 @@ def test_extract_ips_from_xaddrs():
 
 def test_extract_ips_empty():
     assert extract_ips("nessun indirizzo qui") == []
+
+
+def test_find_cameras_merges_dedup_sorts(monkeypatch):
+    from babymonitor import discovery as d
+    monkeypatch.setattr(d, "discover_cameras", lambda: ["192.168.1.67"])
+    monkeypatch.setattr(d, "scan_subnet", lambda *a, **k: ["192.168.1.10", "192.168.1.67"])
+    assert d.find_cameras() == ["192.168.1.10", "192.168.1.67"]
+
+
+def test_scan_subnet_bad_ip(monkeypatch):
+    from babymonitor import discovery as d
+    monkeypatch.setattr(d, "get_lan_ip", lambda: "non-un-ip")
+    assert d.scan_subnet() == []
