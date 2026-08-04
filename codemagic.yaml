@@ -11,7 +11,7 @@
 workflows:
   android-apk:
     name: Baby Monitor - Android APK
-    instance_type: linux_x2
+    instance_type: mac_mini_m2
     max_build_duration: 30
     working_directory: flutter_app
     environment:
