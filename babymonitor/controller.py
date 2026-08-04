@@ -72,7 +72,13 @@ class Controller:
     def apply_camera(self, values: dict) -> dict:
         """Applica i nuovi dati della camera, salva e riavvia lo stream."""
         cam = self.config.camera
-        cam.ip = str(values.get("ip", cam.ip)).strip()
+        raw_ip = str(values.get("ip", cam.ip)).strip()
+        # Se l'utente scrive host:porta, quella e' la porta ONVIF (per il PTZ).
+        if raw_ip.count(":") == 1 and "/" not in raw_ip:
+            _, _, port_part = raw_ip.partition(":")
+            if port_part.isdigit():
+                cam.onvif_port = int(port_part)
+        cam.ip = raw_ip
         cam.rtsp_port = int(values.get("rtsp_port", cam.rtsp_port) or 554)
         cam.username = str(values.get("username", cam.username)).strip()
         if "password" in values:

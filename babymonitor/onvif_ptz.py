@@ -165,25 +165,30 @@ class PtzController:
             self._checked = True
             if not self.ip:
                 return False
-            if not self.port:
-                self.port = find_onvif_port(self.ip)
-            if not self.port:
-                return False
-            # Profilo + verifica presenza PTZ.
-            token, has_ptz = "", False
-            for path in MEDIA_PATHS:
-                resp = _post(self._base() + path, _b_getprofiles(), self.user, self.password,
-                             action=_NS_MEDIA + "/GetProfiles")
-                token, has_ptz = parse_profile(resp)
+
+            # Prova a ottenere i profili (con autenticazione) su ogni porta e
+            # percorso comuni: la porta giusta e' quella che risponde.
+            ports = [self.port] if self.port else COMMON_ONVIF_PORTS
+            token, has_ptz, base = "", False, ""
+            for port in ports:
+                b = "http://%s:%d" % (self.ip, port)
+                for path in MEDIA_PATHS:
+                    resp = _post(b + path, _b_getprofiles(), self.user, self.password,
+                                 action=_NS_MEDIA + "/GetProfiles")
+                    token, has_ptz = parse_profile(resp)
+                    if token:
+                        base = b
+                        self.port = port
+                        break
                 if token:
                     break
             if not token:
                 return False
             self.token = token
-            # Trova l'endpoint PTZ che risponde davvero a uno Stop (comando
-            # innocuo): se risponde con StopResponse, la camera ha il PTZ.
+
+            # Trova l'endpoint PTZ che risponde davvero a uno Stop.
             for path in PTZ_PATHS:
-                url = self._base() + path
+                url = base + path
                 resp = _post(url, _b_stop(token), self.user, self.password, action=_NS_PTZ + "/Stop")
                 if "StopResponse" in resp:
                     self.ptz_url = url
@@ -192,7 +197,7 @@ class PtzController:
             # Se nessun endpoint risponde ma il profilo dichiara il PTZ, provalo
             # comunque sull'endpoint piu' comune.
             if not self.available and has_ptz:
-                self.ptz_url = self._base() + PTZ_PATHS[0]
+                self.ptz_url = base + PTZ_PATHS[0]
                 self.available = True
             return self.available
 
