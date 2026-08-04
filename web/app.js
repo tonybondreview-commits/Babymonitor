@@ -250,26 +250,36 @@
 
   // ---- ascolta l'audio della camera (senti il bimbo) -----------------
   const listenBtn = $("listen-btn");
+  const audioBtn = $("audio-btn");   // stesso comando, sovrapposto al video
   const camAudio = $("cam-audio");
   let listening = false;
-  if (listenBtn && camAudio) {
-    listenBtn.onclick = () => {
-      listening = !listening;
-      if (listening) {
-        camAudio.src = "audio.mp3?" + Date.now();
-        camAudio.play().catch(() => {});
-        listenBtn.textContent = "🔇 Ascolto attivo — tocca per fermare";
-        listenBtn.classList.add("on");
-      } else {
-        camAudio.pause();
-        camAudio.removeAttribute("src");
-        camAudio.load();
-        listenBtn.textContent = "🔊 Ascolta l'audio della camera";
-        listenBtn.classList.remove("on");
-      }
-    };
+  function setListening(on) {
+    listening = on;
+    if (on) {
+      camAudio.src = "audio.mp3?" + Date.now();
+      camAudio.play().catch(() => {});
+    } else {
+      camAudio.pause();
+      camAudio.removeAttribute("src");
+      camAudio.load();
+    }
+    if (listenBtn) {
+      listenBtn.textContent = on ? "🔇 Ascolto attivo — tocca per fermare" : "🔊 Ascolta l'audio della camera";
+      listenBtn.classList.toggle("on", on);
+    }
+    if (audioBtn) {
+      audioBtn.textContent = on ? "🔇" : "🔊";
+      audioBtn.classList.toggle("on", on);
+    }
+  }
+  if (camAudio) {
+    if (listenBtn) listenBtn.onclick = () => setListening(!listening);
+    if (audioBtn) audioBtn.onclick = () => setListening(!listening);
     fetch("api/audio/available").then((r) => r.json()).then((j) => {
-      if (j.available) listenBtn.classList.remove("hidden");
+      if (j.available) {
+        if (listenBtn) listenBtn.classList.remove("hidden");
+        if (audioBtn) audioBtn.classList.remove("hidden");
+      }
     }).catch(() => {});
   }
 

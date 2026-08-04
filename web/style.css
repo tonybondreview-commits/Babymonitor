@@ -146,6 +146,15 @@ main { max-width: 620px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 }
 .fs-btn:active { transform: scale(0.93); }
 
+/* comando audio sovrapposto (a sinistra del pulsante schermo intero) */
+.ov-audio {
+  position: absolute; bottom: 12px; right: 68px; width: 44px; height: 44px;
+  display: grid; place-items: center; background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 13px; font-size: 1.2rem; cursor: pointer;
+}
+.ov-audio:active { transform: scale(0.93); }
+.ov-audio.on { background: rgba(70,194,153,.7); }
+
 .video-card.fs {
   position: fixed; inset: 0; z-index: 300; border-radius: 0; border: none;
   aspect-ratio: auto; width: 100vw; height: 100vh; height: 100dvh;
