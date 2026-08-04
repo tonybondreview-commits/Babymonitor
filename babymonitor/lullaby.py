@@ -22,8 +22,11 @@ AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"}
 
 class LullabyLibrary:
     def __init__(self, directory: str):
-        self.directory = directory
-        os.makedirs(directory, exist_ok=True)
+        # Percorso ASSOLUTO: altrimenti send_file di Flask cerca i file nella
+        # cartella sbagliata (rispetto alla root dell'app, non alla cartella
+        # di lavoro) e da' FileNotFoundError.
+        self.directory = os.path.abspath(directory)
+        os.makedirs(self.directory, exist_ok=True)
         self._proc: subprocess.Popen | None = None
         self._lock = threading.Lock()
 
