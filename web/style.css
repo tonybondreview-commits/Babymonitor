@@ -222,6 +222,14 @@ input[type=range]::-webkit-slider-thumb {
 input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); cursor: pointer; }
 .range-hints { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.72rem; }
 
+/* selettore segmentato (qualità video) */
+.seg { display: flex; gap: 6px; background: var(--surface-2); border: 1px solid var(--border); padding: 5px; border-radius: 13px; }
+.seg button {
+  flex: 1; padding: 10px 8px; border: none; border-radius: 9px; background: transparent;
+  color: var(--muted); font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: background .15s;
+}
+.seg button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+
 /* ---- ninna nanne --------------------------------------------------- */
 .lullabies { display: grid; gap: 14px; }
 .hint { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }

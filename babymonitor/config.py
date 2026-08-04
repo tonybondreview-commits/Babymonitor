@@ -36,6 +36,8 @@ class CameraConfig:
     rtsp_transport: str = "tcp"
     # Porta ONVIF per il controllo PTZ (0 = trovala da sola).
     onvif_port: int = 0
+    # Qualità del video mostrato: "low" | "medium" | "high".
+    video_quality: str = "medium"
 
     def host(self) -> str:
         """Solo l'indirizzo, senza eventuale porta digitata per errore.

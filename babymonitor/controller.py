@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import threading
 
-from .camera import Camera, probe_rtsp
+from .camera import Camera, probe_rtsp, quality_preset, QUALITY_PRESETS
 from .config import CameraConfig, Config
 from .discovery import find_cameras
 from .events import EventBus
@@ -33,8 +33,10 @@ class Controller:
 
     # ---- costruzione / avvio ------------------------------------------
     def _build(self) -> None:
+        q = quality_preset(self.config.camera.video_quality)
         self.camera = Camera(self.config.camera.build_url(),
-                             transport=self.config.camera.rtsp_transport)
+                             transport=self.config.camera.rtsp_transport,
+                             target_width=q["width"], fps=q["fps"], jpeg_q=q["q"])
         self.monitor = Monitor(self.config, self.camera, self.bus)
         c = self.config.camera
         self.ptz = PtzController(c.host(), c.username, c.password, c.onvif_port)
@@ -132,6 +134,21 @@ class Controller:
             cam = self.config.camera
             self._audio_available = has_audio(cam.build_url(), cam.rtsp_transport)
         return self._audio_available
+
+    def set_quality(self, quality: str) -> bool:
+        """Cambia la qualità video e riavvia lo stream."""
+        if quality not in QUALITY_PRESETS:
+            return False
+        self.config.camera.video_quality = quality
+        with self._lock:
+            self.stop()
+            try:
+                self.config.save()
+            except Exception:
+                pass
+            self._build()
+            self.start()
+        return True
 
     def apply_motion(self, values: dict) -> dict:
         m = self.config.motion

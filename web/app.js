@@ -129,6 +129,28 @@
       sensValue.textContent = s.sensitivity;
     }
     setMotionActive(!!s.active && !!s.motion_enabled);
+    if (s.quality) setQualityUI(s.quality);
+  }
+
+  // ---- qualità video --------------------------------------------------
+  const qualitySeg = $("quality-seg");
+  function setQualityUI(q) {
+    if (!qualitySeg) return;
+    qualitySeg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.q === q));
+  }
+  if (qualitySeg) {
+    qualitySeg.querySelectorAll("button").forEach((b) => {
+      b.onclick = async () => {
+        setQualityUI(b.dataset.q);
+        try {
+          await fetch("api/quality", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quality: b.dataset.q }),
+          });
+        } catch (e) { /* ignora */ }
+        setTimeout(reloadVideo, 1600);  // la camera si riavvia con la nuova qualità
+      };
+    });
   }
 
   // ---- avviso "fuori portata" (collegamento col cervello perso) -------

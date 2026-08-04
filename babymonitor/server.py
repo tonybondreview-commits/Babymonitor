@@ -104,7 +104,15 @@ def create_app(controller: Controller) -> Flask:
     def api_status():
         st = controller.monitor.status()
         st["configured"] = controller.is_configured()
+        st["quality"] = controller.config.camera.video_quality
         return jsonify(st)
+
+    @app.route("/api/quality", methods=["POST"])
+    def api_quality():
+        data = request.get_json(silent=True) or {}
+        if not controller.set_quality(str(data.get("quality", ""))):
+            return jsonify({"error": "qualità non valida"}), 400
+        return jsonify({"quality": controller.config.camera.video_quality})
 
     @app.route("/api/motion", methods=["POST"])
     def api_motion():

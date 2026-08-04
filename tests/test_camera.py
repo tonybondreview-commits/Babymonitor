@@ -23,6 +23,13 @@ def make_jpeg(color=128, size=(64, 48)) -> bytes:
     return data
 
 
+def test_quality_presets():
+    from babymonitor.camera import quality_preset, QUALITY_PRESETS
+    assert quality_preset("high")["width"] == 960
+    assert quality_preset("low")["fps"] == 6
+    assert quality_preset("sconosciuta") == QUALITY_PRESETS["medium"]
+
+
 def test_split_two_frames():
     a, b = make_jpeg(50), make_jpeg(200)
     frames, rest = split_jpegs(a + b)

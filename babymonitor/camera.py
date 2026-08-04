@@ -27,6 +27,19 @@ _SOI = b"\xff\xd8"  # inizio di un fotogramma JPEG
 _EOI = b"\xff\xd9"  # fine di un fotogramma JPEG
 
 
+# Preset di qualità video: larghezza, fotogrammi/sec e qualità JPEG (q:v basso
+# = più nitido). "Alta" usa piena definizione dello stream principale.
+QUALITY_PRESETS = {
+    "low":    {"width": 320, "fps": 6,  "q": 9},
+    "medium": {"width": 480, "fps": 8,  "q": 7},
+    "high":   {"width": 960, "fps": 12, "q": 4},
+}
+
+
+def quality_preset(name: str) -> dict:
+    return QUALITY_PRESETS.get(name, QUALITY_PRESETS["medium"])
+
+
 def _ffmpeg_bin() -> str:
     return shutil.which("ffmpeg") or "ffmpeg"
 
@@ -151,9 +164,11 @@ def test_rtsp(url: str, timeout: float = 12.0, transport: str = "tcp") -> dict:
 
 class Camera:
     def __init__(self, rtsp_url: str, transport: str = "tcp", target_width: int = 480,
-                 motion_width: int = 320, fps: int = 8, reconnect_delay: float = 3.0):
+                 motion_width: int = 320, fps: int = 8, jpeg_q: int = 7,
+                 reconnect_delay: float = 3.0):
         self.rtsp_url = rtsp_url
         self.transport = transport if transport in TRANSPORTS else "tcp"
+        self.jpeg_q = jpeg_q                  # qualità JPEG (q:v ffmpeg)
         self.target_width = target_width      # larghezza del video mostrato
         self.motion_width = motion_width      # larghezza usata per l'analisi
         self.fps = fps
@@ -222,7 +237,7 @@ class Camera:
             "-fflags", "nobuffer",
             "-i", self.rtsp_url, "-an",
             "-vf", f"fps={self.fps},scale={self.target_width}:-1",
-            "-f", "mjpeg", "-q:v", "7", "pipe:1", "-loglevel", "error",
+            "-f", "mjpeg", "-q:v", str(self.jpeg_q), "pipe:1", "-loglevel", "error",
         ]
         return subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, bufsize=0)
