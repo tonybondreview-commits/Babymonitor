@@ -234,10 +234,9 @@ class Camera:
     def _spawn(self) -> subprocess.Popen:
         cmd = [
             _ffmpeg_bin(), "-nostdin", "-rtsp_transport", self.transport,
-            # Bassa latenza: nessun buffer di rete/riordino RTP, invio immediato
-            # dei fotogrammi in uscita.
-            "-fflags", "nobuffer", "-flags", "low_delay", "-avioflags", "direct",
-            "-max_delay", "0", "-reorder_queue_size", "0",
+            # Compromesso latenza/fluidita': poco buffer ma il riordino dei
+            # pacchetti UDP resta attivo, cosi' il video non va a scatti.
+            "-fflags", "nobuffer", "-flags", "low_delay",
             "-i", self.rtsp_url, "-an",
             "-vf", f"fps={self.fps},scale={self.target_width}:-1",
             "-q:v", str(self.jpeg_q), "-flush_packets", "1",

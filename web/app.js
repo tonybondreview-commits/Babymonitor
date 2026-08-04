@@ -343,20 +343,21 @@
     }).catch(() => {});
   }
 
-  // Interruttore "Suono di avviso" + pulsante "Prova".
+  // Suono di avviso: interruttore nei comandi + pulsante 🔔 sul video (anche
+  // a schermo pieno) + pulsante "Prova", tutti sincronizzati.
   const soundToggle = $("sound-toggle");
-  if (soundToggle) {
-    soundToggle.onchange = () => {
-      soundOn = soundToggle.checked;
-      if (!soundOn) stopBeeping(); else testBeep();
-    };
-  }
   const soundTest = $("sound-test");
-  if (soundTest) soundTest.onclick = () => {
-    soundOn = true;
-    if (soundToggle) soundToggle.checked = true;
-    testBeep();
-  };
+  const notifBtn = $("notif-btn");
+  function setSound(on, test) {
+    soundOn = on;
+    if (soundToggle) soundToggle.checked = on;
+    if (notifBtn) { notifBtn.textContent = on ? "🔔" : "🔕"; notifBtn.classList.toggle("off", !on); }
+    if (!on) stopBeeping();
+    else if (test) testBeep();
+  }
+  if (soundToggle) soundToggle.onchange = () => setSound(soundToggle.checked, true);
+  if (notifBtn) notifBtn.onclick = () => setSound(!soundOn, true);
+  if (soundTest) soundTest.onclick = () => setSound(true, true);
 
   // Modo notte (tema chiaro/scuro), ricordato sul dispositivo.
   const themeBtn = $("theme-btn");
