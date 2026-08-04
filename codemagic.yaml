@@ -1,0 +1,79 @@
+# Configurazione per compilare l'app Baby Monitor su Codemagic.
+# Non serve nessun Mac: la build gira nel cloud, tu scarichi l'APK.
+#
+# COME SI USA:
+# 1. Vai su https://codemagic.io e accedi con GitHub.
+# 2. Aggiungi questo repository (tonybondreview-commits/Babymonitor).
+# 3. Codemagic trova da solo questo file. Avvia il workflow "android-apk".
+# 4. A fine build scarichi "app-release.apk" (o lo ricevi via email).
+# 5. Copi l'APK sul telefono e lo installi (vedi flutter_app/README.md).
+
+workflows:
+  android-apk:
+    name: Baby Monitor - Android APK
+    instance_type: linux_x2
+    max_build_duration: 30
+    working_directory: flutter_app
+    environment:
+      flutter: stable
+    scripts:
+      - name: Genera il progetto Android
+        script: |
+          # Crea le cartelle android/ (non tocca lib/ ne' assets/).
+          flutter create --platforms=android --project-name baby_monitor .
+
+          # Scrive il manifest con i permessi di rete (Wi-Fi locale + HTTP
+          # in chiaro per l'ONVIF). Il pacchetto e' com.example.baby_monitor.
+          cat > android/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.WAKE_LOCK"/>
+              <uses-permission android:name="android.permission.VIBRATE"/>
+              <application
+                  android:label="Baby Monitor"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme"/>
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2"/>
+              </application>
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.PROCESS_TEXT"/>
+                      <data android:mimeType="text/plain"/>
+                  </intent>
+              </queries>
+          </manifest>
+          EOF
+      - name: Scarica le dipendenze
+        script: flutter pub get
+      - name: Compila l'APK
+        script: flutter build apk --release
+    artifacts:
+      - build/**/outputs/**/*.apk
+    publishing:
+      email:
+        recipients:
+          # Cambia questo indirizzo se vuoi ricevere l'APK altrove.
+          - tony.bondreview@gmail.com
+        notify:
+          success: true
+          failure: true
