@@ -26,6 +26,9 @@ def test_security_has_digest_and_nonce():
 
 def _fake_camera(monkeypatch):
     def fake_post(url, body, user, password, action="", timeout=6.0):
+        if "GetCapabilities" in body:
+            return ('<s:Envelope><Media><XAddr>http://192.168.1.67:5000/onvif/Media</XAddr></Media>'
+                    '<PTZ><XAddr>http://192.168.1.67:5000/onvif/PTZ</XAddr></PTZ></s:Envelope>')
         if "GetProfiles" in body:
             return ('<GetProfilesResponse><Profiles token="IPCProfilesToken0">'
                     '<PTZConfiguration token="PTZ"/></Profiles></GetProfilesResponse>')
@@ -49,6 +52,8 @@ def test_ptz_available_and_move(monkeypatch):
 
 def test_ptz_unavailable_without_ptz_config(monkeypatch):
     def fake_post(url, body, user, password, action="", timeout=6.0):
+        if "GetCapabilities" in body:  # nessun servizio PTZ nella mappa
+            return '<s:Envelope><Media><XAddr>http://192.168.1.67:5000/onvif/Media</XAddr></Media></s:Envelope>'
         if "GetProfiles" in body:
             return '<GetProfilesResponse><Profiles token="T0"></Profiles></GetProfilesResponse>'
         return ""

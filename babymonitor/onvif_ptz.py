@@ -135,6 +135,19 @@ def parse_profile(resp: str) -> tuple[str, bool]:
     return token, has_ptz
 
 
+def get_capabilities(base_url: str, user: str, password: str) -> tuple[str, str, bool]:
+    """Chiede la 'mappa dei servizi' ONVIF. Ritorna (media_XAddr, ptz_XAddr,
+    ha_risposto). Molte camere tengono Media e PTZ su indirizzi separati."""
+    body = ('<GetCapabilities xmlns="%s"><Category>All</Category></GetCapabilities>' % _NS_DEV)
+    resp = _post(base_url + "/onvif/device_service", body, user, password,
+                 action=_NS_DEV + "/GetCapabilities")
+    xaddrs = re.findall(r"XAddr>\s*(https?://[^<\s]+)", resp)
+    media = next((x for x in xaddrs if "media" in x.lower()), "")
+    ptz = next((x for x in xaddrs if "ptz" in x.lower()), "")
+    responded = "Envelope" in resp or "XAddr" in resp
+    return media, ptz, responded
+
+
 class PtzController:
     """Controlla il PTZ di una camera ONVIF. Si auto-configura al primo uso."""
 
@@ -166,40 +179,41 @@ class PtzController:
             if not self.ip:
                 return False
 
-            # Prova a ottenere i profili (con autenticazione) su ogni porta e
-            # percorso comuni: la porta giusta e' quella che risponde.
             ports = [self.port] if self.port else COMMON_ONVIF_PORTS
-            token, has_ptz, base = "", False, ""
             for port in ports:
-                b = "http://%s:%d" % (self.ip, port)
-                for path in MEDIA_PATHS:
-                    resp = _post(b + path, _b_getprofiles(), self.user, self.password,
+                base = "http://%s:%d" % (self.ip, port)
+                media_x, ptz_x, responded = get_capabilities(base, self.user, self.password)
+                if not responded:
+                    continue  # non e' la porta ONVIF
+                self.port = port
+
+                # GetProfiles: prima sull'indirizzo Media dato dalla camera,
+                # poi sui percorsi comuni come riserva.
+                token, has_ptz = "", False
+                media_urls = ([media_x] if media_x else []) + [base + p for p in MEDIA_PATHS]
+                for murl in media_urls:
+                    resp = _post(murl, _b_getprofiles(), self.user, self.password,
                                  action=_NS_MEDIA + "/GetProfiles")
                     token, has_ptz = parse_profile(resp)
                     if token:
-                        base = b
-                        self.port = port
                         break
-                if token:
-                    break
-            if not token:
-                return False
-            self.token = token
+                if not token:
+                    continue
+                self.token = token
 
-            # Trova l'endpoint PTZ che risponde davvero a uno Stop.
-            for path in PTZ_PATHS:
-                url = base + path
-                resp = _post(url, _b_stop(token), self.user, self.password, action=_NS_PTZ + "/Stop")
-                if "StopResponse" in resp:
-                    self.ptz_url = url
+                # Endpoint PTZ: prima quello dato dalla camera, poi i comuni.
+                ptz_urls = ([ptz_x] if ptz_x else []) + [base + p for p in PTZ_PATHS]
+                for purl in ptz_urls:
+                    resp = _post(purl, _b_stop(token), self.user, self.password, action=_NS_PTZ + "/Stop")
+                    if "StopResponse" in resp:
+                        self.ptz_url = purl
+                        self.available = True
+                        break
+                if not self.available and (ptz_x or has_ptz):
+                    self.ptz_url = ptz_x or (base + PTZ_PATHS[0])
                     self.available = True
-                    break
-            # Se nessun endpoint risponde ma il profilo dichiara il PTZ, provalo
-            # comunque sull'endpoint piu' comune.
-            if not self.available and has_ptz:
-                self.ptz_url = base + PTZ_PATHS[0]
-                self.available = True
-            return self.available
+                return self.available
+            return False
 
     def is_available(self) -> bool:
         return self._ensure()
