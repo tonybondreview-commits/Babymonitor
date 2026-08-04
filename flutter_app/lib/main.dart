@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'config.dart';
 import 'home.dart';
@@ -6,6 +7,7 @@ import 'setup.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   runApp(const BabyMonitorApp());
 }
 

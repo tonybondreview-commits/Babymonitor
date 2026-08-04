@@ -10,9 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Decoder video/audio integrato (libVLC): riproduce RTSP direttamente,
-  # cosi' il telefono fa tutto da solo, senza un dispositivo tramite.
-  flutter_vlc_player: ^7.4.1
+  # Decoder video/audio integrato (media_kit = libmpv/ffmpeg): riproduce RTSP
+  # direttamente, come faceva ffmpeg su Termux, ma dentro il telefono.
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.5
   # ONVIF (PTZ) e snapshot via HTTP + digest auth
   http: ^1.2.0
   crypto: ^3.0.3

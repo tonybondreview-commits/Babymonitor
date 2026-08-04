@@ -5,7 +5,8 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -16,8 +17,9 @@ import 'onvif.dart';
 import 'rtsp_probe.dart';
 import 'setup.dart';
 
-/// Schermata principale: video dal vivo con decoder integrato (libVLC),
-/// rilevamento movimento sul dispositivo, PTZ, ascolto audio e ninna nanne.
+/// Schermata principale: video dal vivo con decoder integrato (media_kit,
+/// motore ffmpeg), rilevamento movimento sul dispositivo, PTZ, ascolto audio
+/// e ninna nanne.
 class HomeScreen extends StatefulWidget {
   final CameraConfig config;
   final VoidCallback onReconfigure;
@@ -29,7 +31,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  VlcPlayerController? _vlc;
+  Player? _player;
+  VideoController? _video;
+  final List<StreamSubscription> _subs = [];
   late OnvifPtz _ptz;
   MotionDetector? _motion;
 
@@ -43,17 +47,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _error = false;
   String? _playingLullaby;
 
-  // Apertura del flusso: prova prima UDP (richiesto da questa camera), poi TCP.
+  // Apertura del flusso: prova varie combinazioni finche' una funziona.
   Timer? _watchdog;
   int _attempt = 0;
   bool _swapping = false;
   String? _errText;
-  // Prova in sequenza trasporto (UDP/TCP) x decodifica (hardware/software).
+  // trasporto (UDP/TCP) x decodifica (software/hardware). Software prima:
+  // e' esattamente il percorso ffmpeg che funzionava su Termux.
   static const _configs = <_PlayCfg>[
-    _PlayCfg(false, HwAcc.auto), // UDP, hardware
-    _PlayCfg(true, HwAcc.auto), // TCP, hardware
-    _PlayCfg(false, HwAcc.disabled), // UDP, software
-    _PlayCfg(true, HwAcc.disabled), // TCP, software
+    _PlayCfg(false, false), // UDP, software
+    _PlayCfg(true, false), // TCP, software
+    _PlayCfg(false, true), // UDP, hardware
+    _PlayCfg(true, true), // TCP, hardware
   ];
   _PlayCfg get _cfgNow => _configs[_attempt % _configs.length];
   String get _transport => _cfgNow.label;
@@ -90,26 +95,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
 
     final cfg = _cfgNow;
-    final ctrl = VlcPlayerController.network(
-      widget.config.rtspUrl,
-      hwAcc: cfg.hw,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        advanced: VlcAdvancedOptions([
-          VlcAdvancedOptions.networkCaching(1500),
-        ]),
-        // false = RTP su UDP; true = RTP dentro RTSP/TCP. Proviamo entrambi.
-        rtp: VlcRtpOptions([VlcRtpOptions.rtpOverRtsp(cfg.tcp)]),
-      ),
-    );
-    ctrl.addListener(_onVlcState);
-    _vlc = ctrl;
+    final player = Player();
+    final video = VideoController(player);
+
+    // Opzioni mpv/ffmpeg: stesso motore che funzionava con Termux.
+    final dynamic native = player.platform;
+    Future<void> setProp(String k, String v) async {
+      try {
+        await native.setProperty(k, v);
+      } catch (_) {}
+    }
+
+    await setProp('rtsp-transport', cfg.tcp ? 'tcp' : 'udp');
+    await setProp('hwdec', cfg.hw ? 'auto-safe' : 'no');
+    await setProp('cache', 'no');
+    await setProp('network-timeout', '10');
+
+    _player = player;
+    _video = video;
+
+    // Ascolta gli eventi del player.
+    _subs.add(player.stream.playing.listen((playing) {
+      if (playing) _onConnected();
+    }));
+    _subs.add(player.stream.width.listen((w) {
+      if (w != null && w > 0) _onConnected();
+    }));
+    _subs.add(player.stream.error.listen((e) {
+      _errText = e;
+      _failAttempt();
+    }));
+
+    try {
+      await player.open(Media(widget.config.rtspUrl), play: true);
+      await player.setVolume(_listening ? 100.0 : 0.0);
+    } catch (e) {
+      _errText = '$e';
+      _failAttempt();
+      return;
+    }
 
     if (widget.config.motionEnabled) _motion?.start();
 
     _swapping = false;
     _armWatchdog();
     setState(() {});
+  }
+
+  void _onConnected() {
+    if (!mounted) return;
+    _watchdog?.cancel();
+    if (_connecting || _error) {
+      setState(() {
+        _connecting = false;
+        _error = false;
+        _errText = null;
+      });
+    }
+    _player?.setVolume(_listening ? 100.0 : 0.0);
   }
 
   void _armWatchdog() {
@@ -122,8 +165,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _failAttempt() {
     if (!mounted || _swapping) return;
     _watchdog?.cancel();
-    final v = _vlc;
-    if (v != null && v.value.playingState == PlayingState.playing) return;
+    if (_player?.state.playing == true) return;
     if (_attempt < _configs.length - 1) {
       _attempt++;
       _swapPlayer();
@@ -171,13 +213,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _swapPlayer() async {
     _swapping = true;
     _watchdog?.cancel();
-    final old = _vlc;
-    _vlc = null;
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _subs.clear();
+    final old = _player;
+    _player = null;
+    _video = null;
     if (old != null) {
-      old.removeListener(_onVlcState);
-      try {
-        await old.stopRendererScanning();
-      } catch (_) {}
       try {
         await old.dispose();
       } catch (_) {}
@@ -186,36 +229,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _startPlayer();
   }
 
-  void _onVlcState() {
-    final v = _vlc;
-    if (v == null || !mounted) return;
-    final st = v.value;
-
-    if (st.isInitialized && st.playingState == PlayingState.playing) {
-      _watchdog?.cancel();
-      if (_connecting || _error) {
-        setState(() {
-          _connecting = false;
-          _error = false;
-          _errText = null;
-        });
-      }
-      v.setVolume(_listening ? 100 : 0);
-      return;
-    }
-
-    if (st.hasError) {
-      _errText = st.errorDescription;
-      _failAttempt();
-    }
-  }
-
   Future<Uint8List?> _grabFrame() async {
-    final v = _vlc;
-    if (v == null || !v.value.isInitialized) return null;
-    if (v.value.playingState != PlayingState.playing) return null;
+    final p = _player;
+    if (p == null) return null;
     try {
-      return await v.takeSnapshot();
+      return await p.screenshot(format: 'image/jpeg');
     } catch (_) {
       return null;
     }
@@ -244,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _toggleListen() {
     setState(() => _listening = !_listening);
-    _vlc?.setVolume(_listening ? 100 : 0);
+    _player?.setVolume(_listening ? 100.0 : 0.0);
   }
 
   Future<void> _toggleMotion() async {
@@ -262,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _vlc?.play();
+      _player?.play();
       if (widget.config.motionEnabled) _motion?.start();
     } else if (state == AppLifecycleState.paused) {
       _motion?.stop();
@@ -275,11 +293,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _watchdog?.cancel();
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _subs.clear();
     _motion?.stop();
     _beep.dispose();
     _lullaby.dispose();
-    _vlc?.removeListener(_onVlcState);
-    _vlc?.dispose();
+    _player?.dispose();
     super.dispose();
   }
 
@@ -392,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ---- VIDEO -----------------------------------------------------------
 
   Widget _videoCard({bool rounded = true}) {
-    final v = _vlc;
+    final video = _video;
     final radius = rounded ? BorderRadius.circular(26) : BorderRadius.zero;
     return ClipRRect(
       borderRadius: radius,
@@ -402,11 +423,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (v != null)
-              VlcPlayer(
-                controller: v,
-                aspectRatio: 16 / 9,
-                placeholder: const ColoredBox(color: Colors.black),
+            if (video != null)
+              Video(
+                controller: video,
+                fit: BoxFit.contain,
+                controls: NoVideoControls,
+                fill: Colors.black,
               ),
             if (_error)
               _overlay(
@@ -434,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 'Connessione alla telecamera…',
                 detail: '$_address · $_transport',
               ),
-            if (_motionActive && _vlc != null && !_error) _motionBanner(),
+            if (_motionActive && _video != null && !_error) _motionBanner(),
           ],
         ),
       ),
@@ -870,8 +892,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 /// da provare per aprire il flusso video.
 class _PlayCfg {
   final bool tcp;
-  final HwAcc hw;
+  final bool hw;
   const _PlayCfg(this.tcp, this.hw);
   String get label =>
-      '${tcp ? "TCP" : "UDP"} · ${hw == HwAcc.disabled ? "software" : "hardware"}';
+      '${tcp ? "TCP" : "UDP"} · ${hw ? "hardware" : "software"}';
 }
