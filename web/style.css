@@ -119,6 +119,17 @@ main { max-width: 620px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 }
 #video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
 
+.video-offline {
+  position: absolute; inset: 0; z-index: 5;
+  background: rgba(10, 12, 18, 0.86); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center; text-align: center; color: #fff;
+}
+/* i comandi restano toccabili anche sopra l'avviso "Camera offline" */
+.ov-btn, .ptz-toggle, .ptz-pad { z-index: 6; }
+.vo-icon { font-size: 2.4rem; }
+.vo-title { font-weight: 800; font-size: 1.05rem; margin-top: 8px; }
+.vo-sub { color: #b9c2d4; font-size: 0.85rem; margin-top: 4px; }
+
 .video-top {
   position: absolute; top: 12px; left: 12px; right: 12px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none;

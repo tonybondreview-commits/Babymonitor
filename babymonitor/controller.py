@@ -6,10 +6,11 @@ riavviare il programma).
 from __future__ import annotations
 
 import threading
+import time
 
-from .camera import Camera, probe_rtsp, quality_preset, QUALITY_PRESETS
+from .camera import Camera, probe_rtsp, quality_preset, test_rtsp, QUALITY_PRESETS
 from .config import CameraConfig, Config
-from .discovery import find_cameras
+from .discovery import find_cameras, scan_subnet
 from .events import EventBus
 from .hls_audio import HlsAudio
 from .lullaby import LullabyLibrary
@@ -30,6 +31,8 @@ class Controller:
         self.ptz: PtzController | None = None
         self._audio_available: bool | None = None
         self._lock = threading.Lock()
+        self._health: threading.Thread | None = None
+        self._running_health = False
         self.hls = HlsAudio(lambda: self.config.camera.build_url(),
                             lambda: self.config.camera.rtsp_transport)
         self._build()
@@ -48,12 +51,70 @@ class Controller:
     def start(self) -> None:
         self.camera.start()
         self.monitor.start()
+        # Controllo di salute: se la camera resta irraggiungibile, prova a
+        # ritrovarla (utile se dopo un riavvio ha preso un IP diverso).
+        if self._health is None or not self._health.is_alive():
+            self._running_health = True
+            self._health = threading.Thread(target=self._health_loop, name="health", daemon=True)
+            self._health.start()
 
     def stop(self) -> None:
+        self._running_health = False
         if self.monitor:
             self.monitor.stop()
         if self.camera:
             self.camera.stop()
+
+    def _rebuild_streams(self) -> None:
+        """Ricrea e riavvia camera+monitor senza toccare il thread di salute."""
+        if self.monitor:
+            self.monitor.stop()
+        if self.camera:
+            self.camera.stop()
+        self._build()
+        self.camera.start()
+        self.monitor.start()
+
+    def _health_loop(self) -> None:
+        down_since: float | None = None
+        while self._running_health:
+            time.sleep(8)
+            if not self.camera or self.camera.connected:
+                down_since = None
+                continue
+            if down_since is None:
+                down_since = time.time()
+                continue
+            if time.time() - down_since < 20:
+                continue  # dai tempo alla camera di ripartire sullo stesso IP
+            if self._try_rediscover():
+                down_since = None
+
+    def _try_rediscover(self) -> bool:
+        """Cerca la camera a un nuovo IP (stesso utente/percorso) e si ricollega."""
+        cam = self.config.camera
+        if not cam.rtsp_url:
+            return False
+        current = cam.host()
+        hosts = scan_subnet(554, timeout=0.4)
+        if current in hosts:
+            return False  # l'IP c'e' ancora: e' la camera che sta ripartendo
+        for h in hosts:
+            new_url = cam.rtsp_url.replace(current, h)
+            if new_url == cam.rtsp_url:
+                continue
+            if test_rtsp(new_url, transport=cam.rtsp_transport, timeout=6).get("ok"):
+                cam.ip = h
+                cam.rtsp_url = new_url
+                try:
+                    self.config.save()
+                except Exception:
+                    pass
+                with self._lock:
+                    self._rebuild_streams()
+                self.bus.publish("status", self.monitor.status())
+                return True
+        return False
 
     # ---- stato configurazione -----------------------------------------
     def is_configured(self) -> bool:
@@ -149,13 +210,11 @@ class Controller:
             return False
         self.config.camera.video_quality = quality
         with self._lock:
-            self.stop()
             try:
                 self.config.save()
             except Exception:
                 pass
-            self._build()
-            self.start()
+            self._rebuild_streams()
         return True
 
     def apply_motion(self, values: dict) -> dict:

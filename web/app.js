@@ -131,8 +131,12 @@
     if (statusText) statusText.textContent = text;
     statusPill.className = "pill " + (ok ? "pill--on" : "pill--off");
   }
+  const videoOffline = $("video-offline");
   function applyStatus(s) {
     setStatus(s.connected ? "Camera connessa" : "Camera offline", s.connected);
+    // Copre il video con un avviso quando la camera non e' raggiungibile,
+    // cosi' non si vede mai un vecchio fermo-immagine come se fosse "live".
+    if (videoOffline) videoOffline.classList.toggle("hidden", !!s.connected);
     motionToggle.checked = !!s.motion_enabled;
     motionCount.textContent = (s.motion_count || 0) + " rilevamenti";
     if (typeof s.sensitivity === "number") {

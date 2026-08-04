@@ -33,6 +33,7 @@ class Monitor:
         self.active = False
         self.motion_count = 0
         self._last_active = False
+        self._last_connected = None
 
     def start(self) -> None:
         if self._running:
@@ -76,9 +77,15 @@ class Monitor:
     def _loop(self) -> None:
         last_id = -1
         while self._running:
+            # Segnala subito alla webapp quando la camera si connette/disconnette.
+            conn = self.camera.connected
+            if conn != self._last_connected:
+                self._last_connected = conn
+                self.bus.publish("status", self.status())
+
             frame_id, gray = self.camera.read_gray()
             if gray is None or frame_id == last_id:
-                time.sleep(0.03)
+                time.sleep(0.05)
                 continue
             last_id = frame_id
 
