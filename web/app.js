@@ -211,8 +211,12 @@
         nowPlaying.classList.add("hidden");
         if (currentBtn) { currentBtn.classList.remove("playing"); currentBtn = null; }
         if (!d.ok) {
-          alert("Invio alla telecamera non riuscito:\n" + (d.error || "sconosciuto") +
-                "\n\nIl backchannel è sperimentale: la tua camera potrebbe non accettarlo.");
+          // Torna automaticamente su "Dispositivo": cosi' il prossimo tocco
+          // riproduce sull'iPad senza dover ricordarsi di cambiare modalita'.
+          const devBtn = document.querySelector('#lullaby-target [data-t="device"]');
+          if (devBtn) devBtn.click();
+          alert("La telecamera non accetta l'audio (SETUP rifiutato).\n\n" +
+                "Ho rimesso su 📱 Dispositivo: ora tocca la ninna nanna per sentirla sull'iPad.");
         }
       }
     };
