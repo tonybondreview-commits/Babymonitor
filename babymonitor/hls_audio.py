@@ -38,10 +38,9 @@ class HlsAudio:
     def _cmd(self) -> list[str]:
         return [
             _ffmpeg(), "-nostdin", "-rtsp_transport", self._transport(),
-            "-fflags", "nobuffer", "-flags", "low_delay", "-i", self._url(),
-            # Segmenti brevi (0.5s) e lista corta = meno ritardo possibile per HLS.
+            "-fflags", "nobuffer", "-i", self._url(),
             "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "64k",
-            "-f", "hls", "-hls_time", "0.5", "-hls_list_size", "3",
+            "-f", "hls", "-hls_time", "1", "-hls_list_size", "4",
             "-hls_flags", "delete_segments+omit_endlist",
             "-hls_segment_type", "mpegts",
             "-hls_segment_filename", "seg_%d.ts", "audio.m3u8",
