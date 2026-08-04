@@ -13,6 +13,7 @@ import 'config.dart';
 import 'main.dart' show kMint, kPeach, kBg, kInk;
 import 'motion.dart';
 import 'onvif.dart';
+import 'rtsp_probe.dart';
 import 'setup.dart';
 
 /// Schermata principale: video dal vivo con decoder integrato (libVLC),
@@ -49,6 +50,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _errText;
   static const _transports = ['UDP', 'TCP'];
   String get _transport => _transports[_attempt % _transports.length];
+
+  // Diagnostica di rete (quando il video non parte).
+  String? _diag;
+  String? _suggestPath;
+  bool _diagRunning = false;
 
   @override
   void initState() {
@@ -119,7 +125,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _connecting = false;
         _error = true;
       });
+      _runDiagnostics();
     }
+  }
+
+  // Parla direttamente con la telecamera per capire cosa non va.
+  Future<void> _runDiagnostics() async {
+    if (_diagRunning) return;
+    setState(() {
+      _diagRunning = true;
+      _diag = 'Diagnostica in corso…';
+      _suggestPath = null;
+    });
+    RtspResult res;
+    try {
+      res = await RtspProbe(widget.config).run();
+    } catch (e) {
+      res = RtspResult(reachable: false, message: 'Diagnostica fallita: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _diagRunning = false;
+      _diag = res.message;
+      _suggestPath = res.suggestPath;
+    });
+  }
+
+  Future<void> _applySuggestedPath() async {
+    final p = _suggestPath;
+    if (p == null) return;
+    widget.config.path = p;
+    await widget.config.save();
+    _suggestPath = null;
+    _diag = null;
+    await _refresh();
   }
 
   Future<void> _swapPlayer() async {
@@ -366,8 +405,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _overlay(
                 Icons.videocam_off_rounded,
                 'Telecamera non raggiungibile',
-                detail: _errorDetail(),
+                detail: _diag ?? _errorDetail(),
                 showRetry: true,
+                secondary: _suggestPath != null
+                    ? _overlayButton(
+                        Icons.check_rounded,
+                        'Usa "$_suggestPath"',
+                        _applySuggestedPath,
+                      )
+                    : (!_diagRunning
+                        ? _overlayButton(
+                            Icons.wifi_find_rounded,
+                            'Diagnostica',
+                            _runDiagnostics,
+                          )
+                        : null),
               ),
             if (!_error && _connecting)
               _overlay(
@@ -395,44 +447,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _overlay(IconData? icon, String text,
-      {bool showRetry = false, String? detail}) {
+      {bool showRetry = false, String? detail, Widget? secondary}) {
     return Container(
       color: Colors.black.withOpacity(0.6),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null)
-              Icon(icon, color: Colors.white70, size: 54)
-            else
-              const SizedBox(
-                width: 42,
-                height: 42,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-              ),
-            const SizedBox(height: 16),
-            Text(text,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 15)),
-            if (detail != null) ...[
-              const SizedBox(height: 8),
-              Text(detail,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null)
+                Icon(icon, color: Colors.white70, size: 54)
+              else
+                const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 3),
+                ),
+              const SizedBox(height: 16),
+              Text(text,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
+                  style: const TextStyle(color: Colors.white, fontSize: 15)),
+              if (detail != null) ...[
+                const SizedBox(height: 8),
+                Text(detail,
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(color: Colors.white60, fontSize: 12.5)),
+              ],
+              if (showRetry || secondary != null) ...[
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    if (showRetry)
+                      _overlayButton(Icons.refresh, 'Riprova', _refresh),
+                    if (secondary != null) secondary,
+                  ],
+                ),
+              ],
             ],
-            if (showRetry) ...[
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: kMint),
-                onPressed: _refresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Riprova'),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _overlayButton(IconData icon, String label, VoidCallback onTap) {
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(backgroundColor: kMint),
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
     );
   }
 
