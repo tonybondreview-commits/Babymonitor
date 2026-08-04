@@ -42,6 +42,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _error = false;
   String? _playingLullaby;
 
+  // Apertura del flusso: prova prima UDP (richiesto da questa camera), poi TCP.
+  Timer? _watchdog;
+  int _attempt = 0;
+  bool _swapping = false;
+  String? _errText;
+  static const _transports = ['UDP', 'TCP'];
+  String get _transport => _transports[_attempt % _transports.length];
+
   @override
   void initState() {
     super.initState();
@@ -50,33 +58,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _ptz = OnvifPtz(widget.config);
     _beep.setReleaseMode(ReleaseMode.stop);
     _lullaby.setReleaseMode(ReleaseMode.stop);
-    _startPlayer();
-  }
-
-  Future<void> _startPlayer() async {
-    setState(() {
-      _connecting = true;
-      _error = false;
-    });
-    final ctrl = VlcPlayerController.network(
-      widget.config.rtspUrl,
-      hwAcc: HwAcc.full,
-      autoPlay: true,
-      options: VlcPlayerOptions(
-        advanced: VlcAdvancedOptions([
-          // Buffer basso = meno ritardo (a costo di qualche scatto in più).
-          VlcAdvancedOptions.networkCaching(300),
-          VlcAdvancedOptions.liveCaching(300),
-          VlcAdvancedOptions.fileCaching(300),
-        ]),
-        // Nessun --rtsp-tcp: questa camera vuole UDP.
-        rtp: VlcRtpOptions([VlcRtpOptions.rtpOverRtsp(false)]),
-        extras: ['--no-audio-time-stretch'],
-      ),
-    );
-    ctrl.addListener(_onVlcState);
-    _vlc = ctrl;
-
     _motion = MotionDetector(
       grabFrame: _grabFrame,
       onEvent: _onMotionEvent,
@@ -85,27 +66,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       },
       sensitivity: widget.config.sensitivity,
     );
-    if (widget.config.motionEnabled) _motion!.start();
+    _startPlayer();
+  }
+
+  Future<void> _startPlayer() async {
+    setState(() {
+      _connecting = true;
+      _error = false;
+      _errText = null;
+    });
+
+    final tcp = _transport == 'TCP';
+    final ctrl = VlcPlayerController.network(
+      widget.config.rtspUrl,
+      hwAcc: HwAcc.auto,
+      autoPlay: true,
+      options: VlcPlayerOptions(
+        advanced: VlcAdvancedOptions([
+          VlcAdvancedOptions.networkCaching(1500),
+        ]),
+        // false = RTP su UDP; true = RTP dentro RTSP/TCP. Proviamo entrambi.
+        rtp: VlcRtpOptions([VlcRtpOptions.rtpOverRtsp(tcp)]),
+      ),
+    );
+    ctrl.addListener(_onVlcState);
+    _vlc = ctrl;
+
+    if (widget.config.motionEnabled) _motion?.start();
+
+    _swapping = false;
+    _armWatchdog();
     setState(() {});
+  }
+
+  void _armWatchdog() {
+    _watchdog?.cancel();
+    _watchdog = Timer(const Duration(seconds: 10), _failAttempt);
+  }
+
+  // L'attuale tentativo non ha prodotto video: passa al trasporto successivo
+  // oppure, se le ho provate tutte, mostra l'errore.
+  void _failAttempt() {
+    if (!mounted || _swapping) return;
+    _watchdog?.cancel();
+    final v = _vlc;
+    if (v != null && v.value.playingState == PlayingState.playing) return;
+    if (_attempt < _transports.length - 1) {
+      _attempt++;
+      _swapPlayer();
+    } else {
+      setState(() {
+        _connecting = false;
+        _error = true;
+      });
+    }
+  }
+
+  Future<void> _swapPlayer() async {
+    _swapping = true;
+    _watchdog?.cancel();
+    final old = _vlc;
+    _vlc = null;
+    if (old != null) {
+      old.removeListener(_onVlcState);
+      try {
+        await old.stopRendererScanning();
+      } catch (_) {}
+      try {
+        await old.dispose();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    await _startPlayer();
   }
 
   void _onVlcState() {
     final v = _vlc;
     if (v == null || !mounted) return;
     final st = v.value;
-    final connecting = st.isInitialized == false ||
-        st.playingState == PlayingState.buffering ||
-        st.playingState == PlayingState.initializing;
-    final err = st.hasError;
-    if (connecting != _connecting || err != _error) {
-      setState(() {
-        _connecting = connecting && !err;
-        _error = err;
-      });
-    }
-    // Applica la scelta "ascolto" al volume del player.
-    if (st.isInitialized) {
+
+    if (st.isInitialized && st.playingState == PlayingState.playing) {
+      _watchdog?.cancel();
+      if (_connecting || _error) {
+        setState(() {
+          _connecting = false;
+          _error = false;
+          _errText = null;
+        });
+      }
       v.setVolume(_listening ? 100 : 0);
+      return;
+    }
+
+    if (st.hasError) {
+      _errText = st.errorDescription;
+      _failAttempt();
     }
   }
 
@@ -136,17 +191,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refresh() async {
+    _attempt = 0;
     _motion?.stop();
-    final old = _vlc;
-    _vlc = null;
-    if (old != null) {
-      old.removeListener(_onVlcState);
-      try {
-        await old.stopRendererScanning();
-      } catch (_) {}
-      await old.dispose();
-    }
-    await _startPlayer();
+    await _swapPlayer();
   }
 
   void _toggleListen() {
@@ -181,6 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _watchdog?.cancel();
     _motion?.stop();
     _beep.dispose();
     _lullaby.dispose();
@@ -314,9 +362,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 aspectRatio: 16 / 9,
                 placeholder: const ColoredBox(color: Colors.black),
               ),
-            if (_error) _overlay(Icons.videocam_off_rounded, 'Telecamera non raggiungibile', showRetry: true),
+            if (_error)
+              _overlay(
+                Icons.videocam_off_rounded,
+                'Telecamera non raggiungibile',
+                detail: _errorDetail(),
+                showRetry: true,
+              ),
             if (!_error && _connecting)
-              _overlay(null, 'Connessione alla telecamera…'),
+              _overlay(
+                null,
+                'Connessione alla telecamera…',
+                detail: '$_address · $_transport',
+              ),
             if (_motionActive && _vlc != null && !_error) _motionBanner(),
           ],
         ),
@@ -324,9 +382,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _overlay(IconData? icon, String text, {bool showRetry = false}) {
+  String get _address =>
+      '${widget.config.ip}:${widget.config.rtspPort}/${widget.config.path}';
+
+  String _errorDetail() {
+    final e = (_errText ?? '').trim();
+    final base = 'Indirizzo: $_address';
+    if (e.isEmpty) {
+      return '$base\nVerifica IP, percorso e password (⚙️).';
+    }
+    return '$base\n$e';
+  }
+
+  Widget _overlay(IconData? icon, String text,
+      {bool showRetry = false, String? detail}) {
     return Container(
-      color: Colors.black.withOpacity(0.55),
+      color: Colors.black.withOpacity(0.6),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -341,7 +413,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             const SizedBox(height: 16),
             Text(text,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white, fontSize: 15)),
+            if (detail != null) ...[
+              const SizedBox(height: 8),
+              Text(detail,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12.5)),
+            ],
             if (showRetry) ...[
               const SizedBox(height: 18),
               FilledButton.icon(
