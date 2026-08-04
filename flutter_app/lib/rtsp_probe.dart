@@ -33,6 +33,36 @@ class RtspProbe {
 
   static const _paths = ['onvif1', 'onvif2', 'live/ch0', 'live/ch1', '11', '12'];
 
+  /// Scansiona la rete locale (stessa sottorete dell'IP attuale) cercando un
+  /// dispositivo con la porta RTSP aperta. Restituisce il primo IP trovato.
+  Future<String?> findCamera() async {
+    final ip = cfg.ip;
+    final base = ip.contains('.')
+        ? ip.substring(0, ip.lastIndexOf('.') + 1)
+        : '192.168.1.';
+    final hosts = [for (var i = 1; i <= 254; i++) '$base$i'];
+    const batchSize = 32;
+    for (var start = 0; start < hosts.length; start += batchSize) {
+      final chunk = hosts.skip(start).take(batchSize).toList();
+      final results = await Future.wait(chunk.map(_portOpen));
+      for (final h in results) {
+        if (h != null) return h;
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _portOpen(String host) async {
+    try {
+      final s = await Socket.connect(host, cfg.rtspPort,
+          timeout: const Duration(milliseconds: 600));
+      s.destroy();
+      return host;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<RtspResult> run() async {
     Socket? sock;
     try {

@@ -69,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _diagRunning = false;
 
   bool _fullscreen = false;
+  bool _searching = false;
 
   @override
   void initState() {
@@ -202,6 +203,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _diag = res.message;
       _suggestPath = res.suggestPath;
     });
+    // Se non risponde proprio, prova a ritrovarla (IP cambiato).
+    if (!res.reachable) {
+      _autoSearchIp();
+    }
   }
 
   Future<void> _applySuggestedPath() async {
@@ -217,6 +222,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _swapPlayer() async {
     _swapping = true;
     _watchdog?.cancel();
+    if (mounted) {
+      setState(() {
+        _connecting = true;
+        _error = false;
+      });
+    }
     for (final s in _subs) {
       s.cancel();
     }
@@ -226,9 +237,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _video = null;
     if (old != null) {
       try {
+        await old.stop();
+      } catch (_) {}
+      try {
         await old.dispose();
       } catch (_) {}
     }
+    // La telecamera (economica) tiene aperta la vecchia sessione RTSP per
+    // qualche istante: aspetta che la liberi, altrimenti rifiuta la nuova
+    // connessione (schermo nero / riconnessione infinita).
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
     await _startPlayer();
   }
@@ -245,12 +263,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _onMotionEvent() async {
     if (!mounted) return;
-    if (widget.config.soundEnabled) {
-      try {
-        await _beep.stop();
-        await _beep.play(AssetSource('beep.wav'), volume: 1.0);
-      } catch (_) {}
-    }
+    if (!widget.config.soundEnabled) return; // "Avvisi" spenti = silenzio
+    try {
+      await _beep.stop();
+      await _beep.play(AssetSource('beep.wav'), volume: 1.0);
+    } catch (_) {}
     try {
       if (await Vibration.hasVibrator() ?? false) {
         Vibration.vibrate(pattern: [0, 260, 120, 260]);
@@ -286,6 +303,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await widget.config.save();
     setState(() {});
     await _refresh();
+  }
+
+  Future<void> _toggleSound() async {
+    widget.config.soundEnabled = !widget.config.soundEnabled;
+    await widget.config.save();
+    setState(() {});
+  }
+
+  // Cerca la telecamera nella rete locale (se ha cambiato IP).
+  Future<void> _autoSearchIp() async {
+    if (_searching) return;
+    setState(() {
+      _searching = true;
+      _diag = 'Ricerca telecamera nella rete…';
+      _suggestPath = null;
+    });
+    String? found;
+    try {
+      found = await RtspProbe(widget.config).findCamera();
+    } catch (_) {}
+    if (!mounted) return;
+    if (found != null && found != widget.config.ip) {
+      widget.config.ip = found;
+      await widget.config.save();
+      setState(() {
+        _searching = false;
+        _diag = 'Trovata a $found. Riconnessione…';
+      });
+      await _refresh();
+    } else if (found != null) {
+      setState(() {
+        _searching = false;
+        _diag = 'La telecamera è a $found ma non manda il video.';
+      });
+    } else {
+      setState(() {
+        _searching = false;
+        _diag =
+            'Nessuna telecamera trovata sulla rete.\nControlla che telefono e telecamera siano sullo stesso Wi-Fi.';
+      });
+    }
   }
 
   Future<void> _enterFullscreen() async {
@@ -423,29 +481,43 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(children: [
-                _glassIcon(Icons.fullscreen_exit_rounded, _exitFullscreen),
-                const SizedBox(height: 10),
-                _glassIcon(
-                    _listening ? Icons.volume_up : Icons.volume_off,
-                    _toggleListen,
-                    active: _listening),
-                const SizedBox(height: 10),
-                _glassIcon(
-                    widget.config.motionEnabled
-                        ? Icons.sensors
-                        : Icons.sensors_off,
-                    _toggleMotion,
-                    active: widget.config.motionEnabled),
-                const SizedBox(height: 10),
-                _glassIcon(
-                    widget.config.lowQuality ? Icons.sd_rounded : Icons.hd_rounded,
-                    _toggleQuality),
-                const SizedBox(height: 10),
-                _glassIcon(Icons.refresh_rounded, _refresh),
-                const SizedBox(height: 10),
-                _glassIcon(Icons.music_note_rounded, _openLullabies),
-              ]),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(children: [
+                    _glassIcon(Icons.fullscreen_exit_rounded, _exitFullscreen),
+                    const SizedBox(height: 10),
+                    _glassIcon(
+                        _listening ? Icons.volume_up : Icons.volume_off,
+                        _toggleListen,
+                        active: _listening),
+                    const SizedBox(height: 10),
+                    _glassIcon(
+                        widget.config.motionEnabled
+                            ? Icons.sensors
+                            : Icons.sensors_off,
+                        _toggleMotion,
+                        active: widget.config.motionEnabled),
+                    const SizedBox(height: 10),
+                    _glassIcon(
+                        widget.config.soundEnabled
+                            ? Icons.notifications_active
+                            : Icons.notifications_off,
+                        _toggleSound,
+                        active: widget.config.soundEnabled),
+                    const SizedBox(height: 10),
+                    _glassIcon(
+                        widget.config.lowQuality
+                            ? Icons.sd_rounded
+                            : Icons.hd_rounded,
+                        _toggleQuality),
+                    const SizedBox(height: 10),
+                    _glassIcon(Icons.refresh_rounded, _refresh),
+                    const SizedBox(height: 10),
+                    _glassIcon(Icons.music_note_rounded, _openLullabies),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 8),
               _ptzPad(compact: true),
             ],
           ),
@@ -479,20 +551,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Icons.videocam_off_rounded,
                 'Telecamera non raggiungibile',
                 detail: _diag ?? _errorDetail(),
-                showRetry: true,
-                secondary: _suggestPath != null
-                    ? _overlayButton(
-                        Icons.check_rounded,
-                        'Usa "$_suggestPath"',
-                        _applySuggestedPath,
-                      )
-                    : (!_diagRunning
-                        ? _overlayButton(
-                            Icons.wifi_find_rounded,
-                            'Diagnostica',
-                            _runDiagnostics,
-                          )
-                        : null),
+                showRetry: !_searching,
+                busy: _searching || _diagRunning,
+                extras: [
+                  if (_suggestPath != null)
+                    _overlayButton(Icons.check_rounded, 'Usa "$_suggestPath"',
+                        _applySuggestedPath),
+                  if (!_searching && !_diagRunning)
+                    _overlayButton(Icons.travel_explore_rounded,
+                        'Cerca telecamera', _autoSearchIp),
+                ],
               ),
             if (!_error && _connecting)
               _overlay(
@@ -520,7 +588,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _overlay(IconData? icon, String text,
-      {bool showRetry = false, String? detail, Widget? secondary}) {
+      {bool showRetry = false,
+      String? detail,
+      List<Widget> extras = const [],
+      bool busy = false}) {
     return Container(
       color: Colors.black.withOpacity(0.6),
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -549,7 +620,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     style:
                         const TextStyle(color: Colors.white60, fontSize: 12.5)),
               ],
-              if (showRetry || secondary != null) ...[
+              if (busy) ...[
+                const SizedBox(height: 16),
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2.5),
+                ),
+              ],
+              if (showRetry || extras.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 Wrap(
                   spacing: 10,
@@ -558,7 +638,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   children: [
                     if (showRetry)
                       _overlayButton(Icons.refresh, 'Riprova', _refresh),
-                    if (secondary != null) secondary,
+                    ...extras,
                   ],
                 ),
               ],
@@ -647,6 +727,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 'Movimento',
                 _toggleMotion,
                 active: widget.config.motionEnabled,
+              ),
+              _dockButton(
+                widget.config.soundEnabled
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_off_rounded,
+                'Avvisi',
+                _toggleSound,
+                active: widget.config.soundEnabled,
               ),
               _dockButton(Icons.refresh_rounded, 'Aggiorna', _refresh),
               _dockButton(
