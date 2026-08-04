@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f17">
+  <meta name="theme-color" content="#fbf7f2">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Baby Monitor">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
@@ -15,11 +15,10 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brand-ico">👶</span> Baby&nbsp;Monitor</div>
+    <div class="brand"><span class="brand-ico">👶</span><span class="brand-txt">Baby Monitor</span></div>
     <div class="topbar-right">
-      <div id="status-pill" class="pill pill--off"><span class="pill-dot"></span><span id="status-text">Connessione…</span></div>
-      <button id="sound-btn" class="icon-btn" title="Suono avviso on/off" aria-label="Suono">🔔</button>
-      <button id="qr-btn" class="icon-btn" title="Apri su un altro dispositivo" aria-label="QR">📱</button>
+      <div id="status-pill" class="pill pill--off"><span class="pill-dot"></span><span id="status-text" class="pill-txt">…</span></div>
+      <button id="theme-btn" class="icon-btn" title="Modo notte" aria-label="Modo notte">🌙</button>
       <button id="settings-btn" class="icon-btn" title="Configura camera" aria-label="Configura">⚙️</button>
     </div>
   </header>
@@ -57,6 +56,20 @@
         <input type="range" id="sensitivity" min="1" max="100" value="55">
         <div class="range-hints"><span>Meno falsi allarmi</span><span>Più sensibile</span></div>
       </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <label class="switch">
+          <input type="checkbox" id="sound-toggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="row-label">
+          <strong>Suono di avviso</strong>
+          <small>Beep quando il bimbo si muove</small>
+        </div>
+        <button id="sound-test" class="btn btn--soft btn--sm">Prova</button>
+      </div>
     </section>
 
     <section class="card lullabies">
@@ -69,9 +82,11 @@
       <div id="now-playing" class="now-playing hidden">
         <span id="np-title"></span>
         <label class="loop"><input type="checkbox" id="loop-toggle" checked> ripeti</label>
-        <button id="stop-btn" class="btn btn--stop">Stop</button>
+        <button id="stop-btn" class="btn btn--stop btn--sm">Stop</button>
       </div>
     </section>
+
+    <button id="qr-btn" class="btn btn--soft btn--block">📱 Apri su un altro dispositivo</button>
   </main>
 
   <!-- Suono d'allarme (file audio: affidabile anche su iPhone) -->

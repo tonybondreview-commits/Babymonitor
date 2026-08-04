@@ -248,16 +248,37 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
-  // Pulsante suono: accende/spegne il beep di avviso (e lo fa sentire subito).
-  const soundBtn = $("sound-btn");
-  if (soundBtn) {
-    soundBtn.onclick = () => {
-      soundOn = !soundOn;
-      soundBtn.textContent = soundOn ? "🔔" : "🔕";
-      if (!soundOn) stopBeeping();
-      else testBeep();   // suono di prova: cosi' sai che l'audio funziona
+  // Interruttore "Suono di avviso" + pulsante "Prova".
+  const soundToggle = $("sound-toggle");
+  if (soundToggle) {
+    soundToggle.onchange = () => {
+      soundOn = soundToggle.checked;
+      if (!soundOn) stopBeeping(); else testBeep();
     };
   }
+  const soundTest = $("sound-test");
+  if (soundTest) soundTest.onclick = () => {
+    soundOn = true;
+    if (soundToggle) soundToggle.checked = true;
+    testBeep();
+  };
+
+  // Modo notte (tema chiaro/scuro), ricordato sul dispositivo.
+  const themeBtn = $("theme-btn");
+  function applyTheme(night) {
+    document.body.classList.toggle("night", night);
+    if (themeBtn) themeBtn.textContent = night ? "☀️" : "🌙";
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", night ? "#171520" : "#fbf7f2");
+  }
+  let nightMode = false;
+  try { nightMode = localStorage.getItem("bm-theme") === "night"; } catch (e) {}
+  applyTheme(nightMode);
+  if (themeBtn) themeBtn.onclick = () => {
+    nightMode = !nightMode;
+    applyTheme(nightMode);
+    try { localStorage.setItem("bm-theme", nightMode ? "night" : "light"); } catch (e) {}
+  };
 
   // Pulsante QR: mostra l'indirizzo per aprire l'app su un altro dispositivo.
   const qrBtn = $("qr-btn");
