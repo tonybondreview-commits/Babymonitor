@@ -248,6 +248,34 @@
     settingsBtn.onclick = () => window.BabyWizard.open();
   }
 
+  // ---- PTZ (muovi la camera) -----------------------------------------
+  const ptzToggle = $("ptz-toggle");
+  const ptzPad = $("ptz-pad");
+  async function ptzCmd(action) {
+    try {
+      await fetch("api/ptz", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+    } catch (e) { /* ignora */ }
+  }
+  if (ptzToggle && ptzPad) {
+    ptzToggle.onclick = () => {
+      const show = ptzPad.classList.toggle("hidden") === false;
+      ptzToggle.classList.toggle("on", show);
+    };
+    ptzPad.querySelectorAll(".ptz-btn").forEach((b) => {
+      const dir = b.dataset.dir;
+      const start = (e) => { e.preventDefault(); ptzCmd(dir); };
+      const end = () => ptzCmd("stop");
+      b.addEventListener("pointerdown", start);
+      b.addEventListener("pointerup", end);
+      b.addEventListener("pointerleave", end);
+      b.addEventListener("pointercancel", end);
+    });
+    // Mostra il joystick solo se la camera supporta davvero il PTZ.
+    fetch("api/ptz/available").then((r) => r.json()).then((j) => {
+      if (j.available) ptzToggle.classList.remove("hidden");
+    }).catch(() => {});
+  }
+
   // Interruttore "Suono di avviso" + pulsante "Prova".
   const soundToggle = $("sound-toggle");
   if (soundToggle) {

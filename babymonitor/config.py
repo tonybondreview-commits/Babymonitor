@@ -34,6 +34,8 @@ class CameraConfig:
     # Trasporto RTSP: "tcp" o "udp" (alcune camere accettano solo UDP).
     # Il wizard lo determina da solo durante la prova di collegamento.
     rtsp_transport: str = "tcp"
+    # Porta ONVIF per il controllo PTZ (0 = trovala da sola).
+    onvif_port: int = 0
 
     def host(self) -> str:
         """Solo l'indirizzo, senza eventuale porta digitata per errore.

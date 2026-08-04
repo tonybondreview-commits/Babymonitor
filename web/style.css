@@ -152,6 +152,29 @@ main { max-width: 620px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
 }
 body.fs-open { overflow: hidden; }
 
+/* ---- PTZ (joystick sul video) ------------------------------------- */
+.ptz-toggle {
+  position: absolute; bottom: 12px; left: 12px; width: 44px; height: 44px;
+  display: grid; place-items: center; background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 13px; font-size: 1.2rem; cursor: pointer;
+}
+.ptz-toggle:active, .ptz-toggle.on { transform: scale(0.94); background: rgba(70,194,153,.6); }
+
+.ptz-pad {
+  position: absolute; left: 12px; bottom: 66px; display: flex; align-items: flex-end; gap: 12px;
+  padding: 12px; border-radius: 16px; background: rgba(0,0,0,.4); backdrop-filter: blur(8px);
+}
+.ptz-cross { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 4px; }
+.ptz-up { grid-column: 2; grid-row: 1; } .ptz-left { grid-column: 1; grid-row: 2; }
+.ptz-right { grid-column: 3; grid-row: 2; } .ptz-down { grid-column: 2; grid-row: 3; }
+.ptz-zoom { display: flex; flex-direction: column; gap: 4px; }
+.ptz-btn {
+  width: 44px; height: 44px; display: grid; place-items: center;
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); color: #fff;
+  border-radius: 12px; font-size: 1.15rem; cursor: pointer; touch-action: none; user-select: none;
+}
+.ptz-btn:active { background: var(--accent); transform: scale(0.92); }
+
 /* ---- controlli ----------------------------------------------------- */
 .row { display: flex; align-items: center; gap: 14px; }
 .row-label { display: flex; flex-direction: column; flex: 1; min-width: 0; }

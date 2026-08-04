@@ -13,6 +13,7 @@ from .discovery import find_cameras
 from .events import EventBus
 from .lullaby import LullabyLibrary
 from .monitor import Monitor
+from .onvif_ptz import PtzController
 
 # Valori di default segnaposto: se la camera e' ancora cosi', il wizard parte.
 _PLACEHOLDER_IP = "192.168.1.100"
@@ -25,6 +26,7 @@ class Controller:
         self.library = LullabyLibrary(config.lullaby.directory)
         self.camera: Camera | None = None
         self.monitor: Monitor | None = None
+        self.ptz: PtzController | None = None
         self._lock = threading.Lock()
         self._build()
 
@@ -33,6 +35,8 @@ class Controller:
         self.camera = Camera(self.config.camera.build_url(),
                              transport=self.config.camera.rtsp_transport)
         self.monitor = Monitor(self.config, self.camera, self.bus)
+        c = self.config.camera
+        self.ptz = PtzController(c.host(), c.username, c.password, c.onvif_port)
 
     def start(self) -> None:
         self.camera.start()
@@ -95,6 +99,23 @@ class Controller:
             self._build()
             self.start()
         return {"ok": True}
+
+    # ---- PTZ (movimento camera) ---------------------------------------
+    def ptz_available(self) -> bool:
+        if not self.ptz:
+            return False
+        ok = self.ptz.is_available()
+        # Memorizza la porta ONVIF trovata, cosi' i prossimi avvii sono veloci.
+        if ok and self.ptz.port and self.config.camera.onvif_port != self.ptz.port:
+            self.config.camera.onvif_port = self.ptz.port
+            try:
+                self.config.save()
+            except Exception:
+                pass
+        return ok
+
+    def ptz_command(self, action: str) -> bool:
+        return bool(self.ptz and self.ptz.move(action))
 
     def apply_motion(self, values: dict) -> dict:
         m = self.config.motion

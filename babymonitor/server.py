@@ -150,6 +150,18 @@ def create_app(controller: Controller) -> Flask:
             return jsonify({"ok": False, "error": str(e)}), 400
         return jsonify({"ok": True})
 
+    # ---- PTZ (movimento camera) ---------------------------------------
+    @app.route("/api/ptz/available")
+    def ptz_available():
+        return jsonify({"available": controller.ptz_available()})
+
+    @app.route("/api/ptz", methods=["POST"])
+    def ptz_move():
+        data = request.get_json(silent=True) or {}
+        action = str(data.get("action", ""))
+        ok = controller.ptz_command(action)
+        return jsonify({"ok": ok})
+
     # ---- ninna nanne ---------------------------------------------------
     @app.route("/api/lullabies")
     def api_lullabies():
