@@ -279,14 +279,9 @@
     }
   }
   if (camAudio) {
-    if (listenBtn) listenBtn.onclick = () => setListening(!listening);
-    if (audioBtn) audioBtn.onclick = () => setListening(!listening);
-    fetch("api/audio/available").then((r) => r.json()).then((j) => {
-      if (j.available) {
-        if (listenBtn) listenBtn.classList.remove("hidden");
-        if (audioBtn) audioBtn.classList.remove("hidden");
-      }
-    }).catch(() => {});
+    // Mostriamo sempre il tasto: se la camera non avesse audio, resta muto.
+    if (listenBtn) { listenBtn.onclick = () => setListening(!listening); listenBtn.classList.remove("hidden"); }
+    if (audioBtn) { audioBtn.onclick = () => setListening(!listening); audioBtn.classList.remove("hidden"); }
   }
 
   // ---- PTZ (muovi la camera) -----------------------------------------
