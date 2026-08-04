@@ -48,8 +48,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _attempt = 0;
   bool _swapping = false;
   String? _errText;
-  static const _transports = ['UDP', 'TCP'];
-  String get _transport => _transports[_attempt % _transports.length];
+  // Prova in sequenza trasporto (UDP/TCP) x decodifica (hardware/software).
+  static const _configs = <_PlayCfg>[
+    _PlayCfg(false, HwAcc.auto), // UDP, hardware
+    _PlayCfg(true, HwAcc.auto), // TCP, hardware
+    _PlayCfg(false, HwAcc.disabled), // UDP, software
+    _PlayCfg(true, HwAcc.disabled), // TCP, software
+  ];
+  _PlayCfg get _cfgNow => _configs[_attempt % _configs.length];
+  String get _transport => _cfgNow.label;
 
   // Diagnostica di rete (quando il video non parte).
   String? _diag;
@@ -82,17 +89,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _errText = null;
     });
 
-    final tcp = _transport == 'TCP';
+    final cfg = _cfgNow;
     final ctrl = VlcPlayerController.network(
       widget.config.rtspUrl,
-      hwAcc: HwAcc.auto,
+      hwAcc: cfg.hw,
       autoPlay: true,
       options: VlcPlayerOptions(
         advanced: VlcAdvancedOptions([
           VlcAdvancedOptions.networkCaching(1500),
         ]),
         // false = RTP su UDP; true = RTP dentro RTSP/TCP. Proviamo entrambi.
-        rtp: VlcRtpOptions([VlcRtpOptions.rtpOverRtsp(tcp)]),
+        rtp: VlcRtpOptions([VlcRtpOptions.rtpOverRtsp(cfg.tcp)]),
       ),
     );
     ctrl.addListener(_onVlcState);
@@ -107,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _armWatchdog() {
     _watchdog?.cancel();
-    _watchdog = Timer(const Duration(seconds: 10), _failAttempt);
+    _watchdog = Timer(const Duration(seconds: 8), _failAttempt);
   }
 
   // L'attuale tentativo non ha prodotto video: passa al trasporto successivo
@@ -117,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _watchdog?.cancel();
     final v = _vlc;
     if (v != null && v.value.playingState == PlayingState.playing) return;
-    if (_attempt < _transports.length - 1) {
+    if (_attempt < _configs.length - 1) {
       _attempt++;
       _swapPlayer();
     } else {
@@ -857,4 +864,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
+}
+
+/// Una combinazione di trasporto (UDP/TCP) e decodifica (hardware/software)
+/// da provare per aprire il flusso video.
+class _PlayCfg {
+  final bool tcp;
+  final HwAcc hw;
+  const _PlayCfg(this.tcp, this.hw);
+  String get label =>
+      '${tcp ? "TCP" : "UDP"} · ${hw == HwAcc.disabled ? "software" : "hardware"}';
 }
