@@ -75,6 +75,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WakelockPlus.enable();
+    // Verticale fisso finche' non si tocca "schermo intero".
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _ptz = OnvifPtz(widget.config);
     _beep.setReleaseMode(ReleaseMode.stop);
     _lullaby.setReleaseMode(ReleaseMode.stop);
@@ -299,10 +301,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() => _fullscreen = false);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    // riabilita la rotazione libera poco dopo
-    Future.delayed(const Duration(milliseconds: 600), () {
-      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    });
   }
 
   @override
@@ -360,9 +358,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _topBar(),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: _videoCard(),
+          child: GestureDetector(
+            onTap: _error ? null : _enterFullscreen,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: _videoCard(),
+            ),
           ),
         ),
         const Spacer(),
