@@ -79,20 +79,34 @@ def _looks_ok(resp: str) -> bool:
     return not any(k in low for k in ("fault", "versionmismatch", "actionnotsupported"))
 
 
-def _post(url: str, body: str, user: str, password: str, action: str = "", timeout: float = 6.0) -> str:
-    """Invia una richiesta SOAP provando prima 1.2 e, se non va, 1.1."""
-    header = _security(user, password)
-    # SOAP 1.2
-    ct = "application/soap+xml; charset=utf-8"
-    if action:
-        ct += '; action="%s"' % action
-    resp = _http(url, _ENV12.format(header=header, body=body), {"Content-Type": ct}, timeout)
-    if _looks_ok(resp):
-        return resp
-    # SOAP 1.1 (fallback)
+# Formato SOAP che ha funzionato ("12" o "11"): una volta scoperto, si usa
+# solo quello, cosi' ogni comando e' una sola richiesta (niente tentativi a vuoto).
+_PREFERRED_SOAP: str | None = None
+
+
+def _send(url: str, header: str, body: str, ver: str, action: str, timeout: float) -> str:
+    if ver == "12":
+        ct = "application/soap+xml; charset=utf-8"
+        if action:
+            ct += '; action="%s"' % action
+        return _http(url, _ENV12.format(header=header, body=body), {"Content-Type": ct}, timeout)
     headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"%s"' % action}
-    resp11 = _http(url, _ENV11.format(header=header, body=body), headers, timeout)
-    return resp11 or resp
+    return _http(url, _ENV11.format(header=header, body=body), headers, timeout)
+
+
+def _post(url: str, body: str, user: str, password: str, action: str = "", timeout: float = 6.0) -> str:
+    """Invia una richiesta SOAP. Ricorda il formato (1.2/1.1) che funziona."""
+    global _PREFERRED_SOAP
+    header = _security(user, password)
+    order = ["12", "11"] if _PREFERRED_SOAP != "11" else ["11", "12"]
+    last = ""
+    for ver in order:
+        resp = _send(url, header, body, ver, action, timeout)
+        last = resp
+        if _looks_ok(resp):
+            _PREFERRED_SOAP = ver
+            return resp
+    return last
 
 
 # ---- corpi SOAP -----------------------------------------------------------
@@ -225,11 +239,12 @@ class PtzController:
             return False
         x, y, z = self.DIRS[direction]
         resp = _post(self.ptz_url, _b_move(self.token, x, y, z), self.user, self.password,
-                     action=_NS_PTZ + "/ContinuousMove")
+                     action=_NS_PTZ + "/ContinuousMove", timeout=3.0)
         return "ContinuousMoveResponse" in resp or "Envelope" in resp
 
     def stop(self) -> bool:
         if not self._ensure():
             return False
-        resp = _post(self.ptz_url, _b_stop(self.token), self.user, self.password, action=_NS_PTZ + "/Stop")
+        resp = _post(self.ptz_url, _b_stop(self.token), self.user, self.password,
+                     action=_NS_PTZ + "/Stop", timeout=3.0)
         return "StopResponse" in resp or "Envelope" in resp
