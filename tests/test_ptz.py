@@ -101,3 +101,23 @@ def test_diagnose_tries_2020_when_saved_port_dead(monkeypatch):
     assert ":2020" in diag["ptz_url"]
     # e il controllo "vero" trova anche lui la 2020
     assert ptz.is_available() is True
+
+
+def test_default_not_treated_as_fault():
+    # Un profilo che si chiama "...default..." NON deve sembrare un SOAP fault.
+    ok_resp = '<GetProfilesResponse><Profiles token="profile_default_1"/></GetProfilesResponse>'
+    assert o._is_soap_fault(ok_resp) is False
+    assert o._looks_ok(ok_resp) is True
+    # Un vero fault SI'.
+    assert o._is_soap_fault('<s:Fault><s:Code/></s:Fault>') is True
+    assert o._is_soap_fault('<SOAP-ENV:Fault></SOAP-ENV:Fault>') is True
+
+
+def test_test_move(monkeypatch):
+    _fake_camera(monkeypatch)
+    ptz = PtzController("192.168.1.118", "admin123", "x", onvif_port=2020)
+    res = ptz.test_move("left", seconds=0.1)
+    assert res["ok"] is True and res["move_accepted"] is True
+    assert res["stop_accepted"] is True
+    bad = ptz.test_move("diagonale")
+    assert bad["ok"] is False

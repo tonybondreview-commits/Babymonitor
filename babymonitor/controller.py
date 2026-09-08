@@ -199,6 +199,12 @@ class Controller:
             return {"available": False, "hint": "PTZ non inizializzato."}
         return self.ptz.diagnose()
 
+    def ptz_test_move(self, direction: str) -> dict:
+        """Prova a muovere la camera per un istante (test dal browser)."""
+        if not self.ptz:
+            return {"ok": False, "reason": "PTZ non inizializzato."}
+        return self.ptz.test_move(direction)
+
     # ---- audio dalla camera -------------------------------------------
     def audio_available(self) -> bool:
         if self._audio_available is None:

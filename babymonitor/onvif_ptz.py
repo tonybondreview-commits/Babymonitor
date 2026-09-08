@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -74,11 +75,23 @@ def _http(url: str, envelope: str, headers: dict, timeout: float) -> str:
         return ""
 
 
+def _is_soap_fault(resp: str) -> bool:
+    """True se la risposta e' un vero SOAP Fault.
+
+    Cerchiamo il TAG <...Fault> (con o senza namespace), non la parola "fault"
+    a caso: altrimenti un profilo che si chiama "de*fault*" verrebbe scambiato
+    per un errore.
+    """
+    low = resp.lower()
+    if "versionmismatch" in low or "actionnotsupported" in low:
+        return True
+    return re.search(r"<[a-z0-9-]*:?fault[\s>/]", low) is not None
+
+
 def _looks_ok(resp: str) -> bool:
     if not resp:
         return False
-    low = resp.lower()
-    return not any(k in low for k in ("fault", "versionmismatch", "actionnotsupported"))
+    return not _is_soap_fault(resp)
 
 
 # Formato SOAP che ha funzionato ("12" o "11"): una volta scoperto, si usa
@@ -243,6 +256,25 @@ class PtzController:
     def is_available(self) -> bool:
         return self._ensure()
 
+    def test_move(self, direction: str, seconds: float = 0.8) -> dict:
+        """Muove la camera per un istante e poi ferma, riferendo se i comandi
+        sono stati accettati. Serve a verificare "a occhio" che il PTZ funzioni
+        davvero (la camera si sposta) direttamente dal browser."""
+        if direction not in self.DIRS:
+            return {"ok": False, "reason": "direzione non valida (%s)" % direction,
+                    "valid": sorted(self.DIRS.keys())}
+        if not self._ensure():
+            return {"ok": False, "reason": "PTZ non disponibile su questa camera"}
+        moved = self.move(direction)
+        time.sleep(max(0.1, min(seconds, 3.0)))
+        stopped = self.stop()
+        return {"ok": moved, "direction": direction,
+                "move_accepted": moved, "stop_accepted": stopped,
+                "port": self.port, "ptz_url": self.ptz_url,
+                "hint": "" if moved else ("La camera ha rifiutato il comando di "
+                        "movimento: forse il modello non e' motorizzato o vuole "
+                        "un profilo/endpoint PTZ diverso.")}
+
     def diagnose(self) -> dict:
         """Ripercorre passo-passo il rilevamento ONVIF/PTZ e racconta cosa
         succede a ogni tappa. Serve per capire PERCHE' il joystick non compare
@@ -282,10 +314,11 @@ class PtzController:
                 resp = _post(murl, _b_getprofiles(), self.user, self.password,
                              action=_NS_MEDIA + "/GetProfiles")
                 token, has_ptz = parse_profile(resp)
-                if token or "fault" in resp.lower():
+                fault = _is_soap_fault(resp)
+                if token or fault:
                     steps.append({"port": port, "get_profiles_url": murl,
                                   "token_found": bool(token), "has_ptz_config": has_ptz,
-                                  "auth_fault": "fault" in resp.lower()})
+                                  "auth_fault": fault})
                 if token:
                     break
             if not token:

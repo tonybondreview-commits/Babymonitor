@@ -237,6 +237,10 @@ def create_app(controller: Controller) -> Flask:
 
     @app.route("/api/ptz/diag")
     def ptz_diag():
+        # ?move=left|right|up|down  ->  prova a muovere la camera per un istante.
+        move = str(request.args.get("move", "")).strip().lower()
+        if move:
+            return jsonify(controller.ptz_test_move(move))
         return jsonify(controller.ptz_diagnose())
 
     @app.route("/api/ptz", methods=["POST"])
