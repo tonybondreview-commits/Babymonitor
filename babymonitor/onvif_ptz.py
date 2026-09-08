@@ -20,7 +20,9 @@ import urllib.request
 from datetime import datetime, timezone
 
 # Porte ONVIF piu' comuni (la Fredi dell'utente usa la 5000).
-COMMON_ONVIF_PORTS = [5000, 80, 8080, 8899, 8000, 2000]
+# 5000/8899 = Fredi-Yoosee, 2020 = TP-Link Tapo, le altre sono comuni
+# su molte camere ONVIF economiche.
+COMMON_ONVIF_PORTS = [5000, 2020, 80, 8080, 8899, 8000, 2000]
 # Percorsi possibili dei servizi ONVIF.
 DEVICE_PATHS = ["/onvif/device_service"]
 MEDIA_PATHS = ["/onvif/media_service", "/onvif/Media", "/onvif/media", "/onvif/device_service"]

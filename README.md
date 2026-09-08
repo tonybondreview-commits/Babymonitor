@@ -1,7 +1,7 @@
-# 👶 Baby Monitor per camere Fredi / Yoosee
+# 👶 Baby Monitor per camere Fredi / Yoosee e TP-Link Tapo
 
-Trasforma una comune camera da interno **Fredi** (app **Yoosee**) in un baby
-monitor con due funzioni:
+Trasforma una comune camera da interno **Fredi** (app **Yoosee**) o **TP-Link
+Tapo** (C100/C200/C210...) in un baby monitor con due funzioni:
 
 1. **Rilevamento del movimento** → quando il bimbo si muove, appare un
    **popup** (con suono e vibrazione) sullo schermo dell'app.
@@ -51,6 +51,11 @@ un'**app companion** separata che sfrutta lo stream video della camera
 
 ## 🔧 1. Prepara la camera
 
+Il progetto funziona con qualunque camera che parli **RTSP/ONVIF**. Le due
+famiglie testate:
+
+### Fredi / Yoosee
+
 1. Apri l'app **Yoosee** → impostazioni della camera → attiva **ONVIF**
    (a volte chiamato "protocollo terze parti" / "RTSP"). Imposta o annota
    **utente e password ONVIF**.
@@ -58,9 +63,29 @@ un'**app companion** separata che sfrutta lo stream video della camera
    dispositivi connessi, oppure nell'app Yoosee → info dispositivo).
    Conviene assegnarle un **IP fisso** dal router, così non cambia.
 
-Gli URL RTSP tipici delle Fredi/Yoosee sono:
+URL RTSP tipici:
 - Alta qualità: `rtsp://utente:password@IP:554/onvif1`
 - Leggero (consigliato per il rilevamento): `rtsp://utente:password@IP:554/onvif2`
+
+### TP-Link Tapo (C100, C110, C200, **C210**, C310...)
+
+⚠️ **L'account TP-Link non funziona per il video.** Serve un
+**Account telecamera** dedicato:
+
+1. App **Tapo** → la tua camera → **⚙ (impostazioni)** → **Avanzate** →
+   **Account telecamera** → crea **utente e password** (sono nuovi, li scegli
+   tu) e salva.
+2. Nella stessa schermata assicurati che il flusso RTSP sia attivo, e prendi
+   nota dell'**IP** (⚙ → Avanzate → Informazioni dispositivo, oppure dal
+   router; conviene fissarlo).
+3. Nel wizard del Baby Monitor inserisci **quell'utente e quella password**.
+
+URL RTSP tipici:
+- Alta qualità: `rtsp://utente:password@IP:554/stream1`
+- Leggero (consigliato per il rilevamento): `rtsp://utente:password@IP:554/stream2`
+
+La porta ONVIF delle Tapo è la **2020** (serve per il movimento della camera:
+la C210 è motorizzata). Guida completa: [docs/setup-tapo.md](docs/setup-tapo.md).
 
 ---
 
@@ -201,6 +226,7 @@ acceso / disattiva l'ottimizzazione batteria per Termux.
 | Sintomo | Soluzione |
 |---|---|
 | "Camera offline" | Verifica IP, utente/password, e che **ONVIF** sia attivo in Yoosee. Prova `stream: "main"`. |
+| "utente/password rifiutati dalla camera" (Tapo) | Non stai usando l'**Account telecamera**: app Tapo → ⚙ → Avanzate → Account telecamera. L'account TP-Link non vale. |
 | Non apre la pagina dal telefono | Devono essere sulla **stessa rete WiFi**. Controlla il firewall sul cervello (porta 8080). |
 | Troppi falsi allarmi | Abbassa la **sensibilità**, aumenta `consecutive_frames` o `cooldown_seconds`. |
 | Non rileva movimenti piccoli | Alza la **sensibilità**; usa lo stream `main`. |

@@ -66,8 +66,10 @@
     el.innerHTML =
       '<div class="wiz-emoji">👶</div>' +
       '<h2>Benvenuto nel Baby Monitor</h2>' +
-      '<p>Configuriamo tutto in pochi passi. Assicurati che nell\'app <b>Yoosee</b> ' +
-      'sia attivo <b>ONVIF</b> e che la camera sia accesa sulla stessa rete WiFi.</p>';
+      '<p>Configuriamo tutto in pochi passi. Assicurati che la camera sia accesa ' +
+      'sulla stessa rete WiFi e che lo streaming sia abilitato: su <b>Yoosee</b> ' +
+      'attiva <b>ONVIF</b>, su <b>Tapo</b> crea l\'<b>Account telecamera</b> ' +
+      '(app Tapo → ⚙ → Avanzate → Account telecamera).</p>';
     nav(el, { back: false, next: () => go(1), nextLabel: "Iniziamo →" });
   }
 
@@ -81,6 +83,9 @@
       '<label>Indirizzo IP<input id="wiz-ip" inputmode="decimal" placeholder="192.168.1.100" value="' + esc(cam.ip) + '"></label>' +
       '<label>Utente<input id="wiz-user" value="' + esc(cam.username) + '"></label>' +
       '<label>Password<input id="wiz-pass" type="password" value="' + esc(cam.password) + '"></label>' +
+      '<p class="wiz-note">Su <b>Tapo</b> usa utente e password dell\'<b>Account telecamera</b> ' +
+      'creato nell\'app Tapo (⚙ → Avanzate → Account telecamera), <b>non</b> l\'account TP-Link. ' +
+      'Su <b>Yoosee</b> l\'utente e\' di solito <code>admin</code>.</p>' +
       '<label>Qualità video' +
       '<select id="wiz-stream">' +
       '<option value="sub"' + (cam.stream === "sub" ? " selected" : "") + '>Leggera (consigliata)</option>' +
@@ -153,8 +158,10 @@
         nav(el, { next: () => saveAndNext(), nextLabel: "Perfetto, avanti →" });
       } else {
         box.className = "wiz-test wiz-test--err";
+        const hint = res.hint ||
+          "Controlla IP, utente e password, e che lo streaming RTSP/ONVIF sia attivo nell'app della camera.";
         box.innerHTML = "❌ Non riesco a collegarmi.<br><small>" + esc(res.error || "") + "</small>" +
-          "<br><small>Controlla IP, utente/password e che ONVIF sia attivo in Yoosee.</small>";
+          "<br><small>" + esc(hint) + "</small>";
         const retry = document.createElement("button");
         retry.className = "btn btn--primary wiz-full";
         retry.textContent = "🔄 Riprova";

@@ -3,9 +3,13 @@
 #   cp config.example.yaml config.yaml
 
 camera:
-  # IP della camera Fredi sulla rete di casa (lo trovi nel router o nell'app).
+  # IP della camera sulla rete di casa (lo trovi nel router o nell'app).
   ip: "192.168.1.100"
   rtsp_port: 554
+  # Fredi/Yoosee: di solito "admin".
+  # TP-Link Tapo: l'utente dell'"Account telecamera" creato nell'app Tapo
+  # (app Tapo -> camera -> ingranaggio -> Avanzate -> Account telecamera).
+  # L'account TP-Link NON funziona per il video. Vedi docs/setup-tapo.md.
   username: "admin"
   # Meglio NON scrivere la password qui: usa la variabile d'ambiente
   # CAMERA_PASSWORD (vedi README). Se la metti qui, tienila privata.
@@ -13,7 +17,8 @@ camera:
   # "sub" = sottostream (leggero, consigliato); "main" = alta qualita'.
   stream: "sub"
   # In alternativa, se conosci l'URL RTSP completo, mettilo qui e ignora i campi sopra:
-  # rtsp_url: "rtsp://admin:pass@192.168.1.100:554/onvif2"
+  # Yoosee: "rtsp://admin:pass@192.168.1.100:554/onvif2"
+  # Tapo:   "rtsp://utente:pass@192.168.1.100:554/stream2"
   rtsp_url: ""
 
 motion:

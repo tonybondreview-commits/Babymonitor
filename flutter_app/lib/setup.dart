@@ -22,8 +22,14 @@ class _SetupScreenState extends State<SetupScreen> {
   late final TextEditingController _rtspPort;
   late final TextEditingController _onvifPort;
   late int _sensitivity;
+  late String _subPath;
   bool _showAdvanced = false;
   bool _obscure = true;
+
+  /// Modello riconosciuto/scelto: '' (generico), 'yoosee' o 'tapo'.
+  /// Serve solo per riempire i percorsi RTSP e dare il consiglio giusto
+  /// sulle credenziali, che cambiano da marca a marca.
+  String _model = '';
 
   @override
   void initState() {
@@ -36,6 +42,45 @@ class _SetupScreenState extends State<SetupScreen> {
     _rtspPort = TextEditingController(text: c.rtspPort.toString());
     _onvifPort = TextEditingController(text: c.onvifPort.toString());
     _sensitivity = c.sensitivity;
+    _subPath = c.subPath;
+    _model = _modelOf(c.path);
+  }
+
+  /// Indovina il modello dal percorso RTSP gia' configurato.
+  String _modelOf(String path) {
+    if (path.startsWith('stream')) return 'tapo';
+    if (path.startsWith('onvif')) return 'yoosee';
+    return '';
+  }
+
+  /// Applica i valori tipici del modello scelto (percorsi e porta ONVIF).
+  void _applyModel(String model) {
+    setState(() {
+      _model = model;
+      if (model == 'tapo') {
+        _path.text = 'stream1';
+        _subPath = 'stream2';
+        _onvifPort.text = '2020';
+      } else if (model == 'yoosee') {
+        _path.text = 'onvif1';
+        _subPath = 'onvif2';
+        _onvifPort.text = '5000';
+      }
+    });
+  }
+
+  String get _credentialsNote {
+    if (_model == 'tapo') {
+      return 'Su Tapo servono utente e password dell\'"Account telecamera": '
+          'app Tapo → la tua camera → ⚙ → Avanzate → Account telecamera. '
+          'Non funziona l\'account TP-Link con cui entri nell\'app.';
+    }
+    if (_model == 'yoosee') {
+      return 'Su Yoosee l\'utente e\' di solito "admin" con la password del '
+          'dispositivo, e ONVIF va attivato nell\'app.';
+    }
+    return 'Molte camere vogliono credenziali dedicate allo streaming, '
+        'diverse da quelle con cui entri nell\'app del produttore.';
   }
 
   @override
@@ -62,6 +107,7 @@ class _SetupScreenState extends State<SetupScreen> {
     c.username = _user.text.trim();
     c.password = _pass.text;
     c.path = _path.text.trim().replaceAll(RegExp(r'^/+'), '');
+    c.subPath = _subPath;
     c.rtspPort = int.tryParse(_rtspPort.text.trim()) ?? 554;
     c.onvifPort = int.tryParse(_onvifPort.text.trim()) ?? 5000;
     c.sensitivity = _sensitivity;
@@ -118,6 +164,14 @@ class _SetupScreenState extends State<SetupScreen> {
               icon: Icons.videocam_rounded,
               title: 'Telecamera',
               children: [
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _modelChip('Fredi / Yoosee', 'yoosee'),
+                    _modelChip('TP-Link Tapo', 'tapo'),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: _ip,
                   keyboardType: TextInputType.url,
@@ -139,6 +193,11 @@ class _SetupScreenState extends State<SetupScreen> {
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
                   ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _credentialsNote,
+                  style: const TextStyle(fontSize: 12.5, color: Colors.black54),
                 ),
               ],
             ),
@@ -178,7 +237,9 @@ class _SetupScreenState extends State<SetupScreen> {
                   ? [
                       TextField(
                         controller: _path,
-                        decoration: _dec('Percorso RTSP', hint: 'onvif1'),
+                        decoration: _dec('Percorso RTSP',
+                            hint: 'onvif1 (Yoosee) / stream1 (Tapo)'),
+                        onChanged: (v) => setState(() => _model = _modelOf(v.trim())),
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -220,6 +281,25 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _modelChip(String label, String value) {
+    final selected = _model == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => _applyModel(value),
+      selectedColor: kMint.withOpacity(0.28),
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        color: kInk,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: kMint.withOpacity(selected ? 0.6 : 0.25)),
       ),
     );
   }

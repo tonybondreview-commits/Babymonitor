@@ -31,7 +31,20 @@ class RtspProbe {
   final CameraConfig cfg;
   RtspProbe(this.cfg);
 
-  static const _paths = ['onvif1', 'onvif2', 'live/ch0', 'live/ch1', '11', '12'];
+  // Percorsi RTSP piu' comuni: onvif1/2 = Fredi-Yoosee, stream1/2 = TP-Link Tapo.
+  static const _paths = [
+    'onvif1',
+    'onvif2',
+    'stream1',
+    'stream2',
+    'live/ch0',
+    'live/ch1',
+    '11',
+    '12',
+  ];
+
+  /// Porta ONVIF delle TP-Link Tapo: se risponde, e' quasi certamente una Tapo.
+  static const _tapoOnvifPort = 2020;
 
   /// Scansiona la rete locale (stessa sottorete dell'IP attuale) cercando un
   /// dispositivo con la porta RTSP aperta. Restituisce il primo IP trovato.
@@ -60,6 +73,18 @@ class RtspProbe {
       return host;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Vero se la porta ONVIF tipica delle Tapo (2020) risponde.
+  Future<bool> _looksLikeTapo() async {
+    try {
+      final s = await Socket.connect(cfg.ip, _tapoOnvifPort,
+          timeout: const Duration(milliseconds: 700));
+      s.destroy();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -119,11 +144,13 @@ class RtspProbe {
       }
 
       if (lastStatus == 401) {
+        final tapo = await _looksLikeTapo();
         return RtspResult(
           reachable: true,
           status: 401,
-          message:
-              'La telecamera risponde ma rifiuta la password (401).\nControlla utente e password (⚙️).',
+          message: tapo
+              ? 'La telecamera rifiuta utente e password (401).\nSulle Tapo il video RTSP non usa l\'account TP-Link: apri l\'app Tapo → ⚙ → Avanzate → "Account telecamera", crea li\' utente e password e scrivili qui (⚙️).'
+              : 'La telecamera risponde ma rifiuta la password (401).\nControlla utente e password (⚙️).',
         );
       }
       if (lastStatus == 404) {

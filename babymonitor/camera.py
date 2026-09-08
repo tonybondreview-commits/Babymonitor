@@ -1,7 +1,8 @@
 """Collegamento alla camera via RTSP e produzione dei fotogrammi.
 
-Usa **ffmpeg** (non OpenCV) per leggere lo stream RTSP della camera Fredi/Yoosee
-e produrre un flusso MJPEG. Da ogni fotogramma JPEG:
+Usa **ffmpeg** (non OpenCV) per leggere lo stream RTSP della camera
+(Fredi/Yoosee, TP-Link Tapo, o qualunque altra ONVIF) e produrre un flusso
+MJPEG. Da ogni fotogramma JPEG:
   - serviamo direttamente i byte JPEG al browser (streaming MJPEG);
   - con **Pillow** lo decodifichiamo in scala di grigi per l'analisi del movimento.
 
@@ -22,6 +23,8 @@ import time
 
 import numpy as np
 from PIL import Image, ImageFilter
+
+from .brands import auth_hint, detect_brand, priority_paths
 
 _SOI = b"\xff\xd8"  # inizio di un fotogramma JPEG
 _EOI = b"\xff\xd9"  # fine di un fotogramma JPEG
@@ -66,19 +69,28 @@ def split_jpegs(buffer: bytes) -> tuple[list[bytes], bytes]:
     return frames, buffer
 
 
-# Percorsi RTSP piu' comuni sulle camere ONVIF economiche (Fredi/Yoosee e
-# cloni). Il wizard li prova in ordine finche' uno funziona.
+# Percorsi RTSP piu' comuni sulle camere ONVIF economiche. Il wizard li prova
+# in ordine finche' uno funziona; se riconosciamo la marca (Tapo, Yoosee...)
+# i suoi percorsi passano davanti a tutti (vedi brands.py).
 CANDIDATE_PATHS = [
     "onvif1", "onvif2",
+    "stream1", "stream2",          # TP-Link Tapo (C100/C200/C210/C310...)
     "11", "12",
     "live/ch0", "live/ch1", "live/ch00_0", "live/ch01_0",
     "media/video1", "media/video2",
-    "h264", "h264_stream", "stream1", "stream2",
+    "h264", "h264_stream",
     "cam/realmonitor?channel=1&subtype=0",
     "cam/realmonitor?channel=1&subtype=1",
     "ch0_0.h264", "ch0_1.h264",
     "video1", "1", "0",
 ]
+
+
+def ordered_paths(brand: str) -> list[str]:
+    """CANDIDATE_PATHS con davanti i percorsi tipici della marca riconosciuta."""
+    first = [p for p in priority_paths(brand) if p]
+    return first + [p for p in CANDIDATE_PATHS if p not in first]
+
 
 # Errori che indicano "camera irraggiungibile": inutile insistere.
 _NET_HINTS = ("no route to host", "timeout", "refused", "unreachable",
@@ -97,47 +109,77 @@ def _is_auth_error(err: str) -> bool:
 TRANSPORTS = ("tcp", "udp")  # alcune camere accettano solo UDP
 
 
-def probe_rtsp(cam, timeout_each: float = 6.0) -> dict:
-    """Trova la combinazione RTSP che funziona provando: percorsi comuni ×
-    trasporto (TCP/UDP) × con o senza credenziali.
+# Dopo questi percorsi tutti respinti con "401" e' inutile insistere: non e' il
+# percorso a essere sbagliato, sono utente/password.
+AUTH_GIVE_UP_AFTER = 3
 
-    `cam` e' un CameraConfig. Ritorna {"ok", "url", "path", "transport", "error"}.
-    Si ferma subito se la camera e' irraggiungibile.
+
+def probe_rtsp(cam, timeout_each: float = 6.0, brand: str | None = None) -> dict:
+    """Trova la combinazione RTSP che funziona provando: percorsi comuni x
+    trasporto (TCP/UDP) x con o senza credenziali.
+
+    `cam` e' un CameraConfig. `brand` (opzionale) salta il riconoscimento della
+    marca, utile nei test. Ritorna
+    {"ok", "url", "path", "transport", "brand", "error", "hint"}.
+    Si ferma subito se la camera e' irraggiungibile o se rifiuta le credenziali.
     """
+    if brand is None:
+        brand = detect_brand(cam.host(), rtsp_port=cam.rtsp_port)
+
+    def fail(error: str, auth: bool = False) -> dict:
+        return {"ok": False, "url": "", "path": "", "transport": "",
+                "brand": brand, "error": error,
+                "hint": auth_hint(brand) if auth else ""}
+
+    def done(url: str, path: str, transport: str) -> dict:
+        return {"ok": True, "url": url, "path": path, "transport": transport,
+                "brand": brand, "error": "", "hint": ""}
+
     if getattr(cam, "rtsp_url", ""):
+        r = {"error": ""}
         for transport in TRANSPORTS:
             r = test_rtsp(cam.rtsp_url, timeout=timeout_each + 3, transport=transport)
             if r["ok"]:
-                return {"ok": True, "url": cam.rtsp_url, "path": "",
-                        "transport": transport, "error": ""}
+                return done(cam.rtsp_url, "", transport)
             if _is_net_error(r.get("error", "")):
                 break
-        return {"ok": False, "url": "", "path": "", "transport": "",
-                "error": r.get("error", "")}
+        err = r.get("error", "")
+        if _is_auth_error(err):
+            return fail("utente/password rifiutati dalla camera", auth=True)
+        return fail(err)
 
     last_err = ""
     saw_auth = False
-    for path in CANDIDATE_PATHS:
+    auth_only_paths = 0          # percorsi di fila respinti solo per le credenziali
+    for path in ordered_paths(brand):
+        path_auth_only = True
         for transport in TRANSPORTS:
             for with_creds in (True, False):
                 url = cam.url_for_path(path, with_credentials=with_creds)
                 r = test_rtsp(url, timeout=timeout_each, transport=transport)
                 if r["ok"]:
-                    return {"ok": True, "url": url, "path": path,
-                            "transport": transport, "error": ""}
+                    return done(url, path, transport)
                 err = r.get("error", "")
                 last_err = err
                 if _is_net_error(err):
-                    return {"ok": False, "url": "", "path": "",
-                            "transport": "", "error": err}
+                    return fail(err)
                 if _is_auth_error(err):
                     saw_auth = True
                     continue          # riprova senza credenziali, stesso trasporto
+                path_auth_only = False
                 break                 # 404 / trasporto errato: passa al trasporto dopo
+        if path_auth_only:
+            auth_only_paths += 1
+            if auth_only_paths >= AUTH_GIVE_UP_AFTER:
+                # La camera risponde ma respinge sempre le credenziali:
+                # continuare con gli altri percorsi non cambierebbe nulla.
+                return fail("utente/password rifiutati dalla camera", auth=True)
+        else:
+            auth_only_paths = 0
+
     if saw_auth and _is_auth_error(last_err):
-        last_err = "utente/password rifiutati dalla camera"
-    return {"ok": False, "url": "", "path": "", "transport": "",
-            "error": last_err or "nessun percorso video valido trovato"}
+        return fail("utente/password rifiutati dalla camera", auth=True)
+    return fail(last_err or "nessun percorso video valido trovato")
 
 
 def test_rtsp(url: str, timeout: float = 12.0, transport: str = "tcp") -> dict:
