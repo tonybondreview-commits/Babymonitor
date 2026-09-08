@@ -74,11 +74,23 @@
 
   // ---- schermo intero (stile player) ---------------------------------
   const fsBtn = $("fs-btn");
+
+  // Se il telefono e' tenuto in verticale ruotiamo noi il video di 90° (finto
+  // landscape): su iPhone/iPad il browser NON permette di bloccare
+  // l'orientamento, quindi e' l'unico modo per vedere il video "sdraiato".
+  // Se invece l'utente gira fisicamente il telefono, togliamo la rotazione.
+  function applyFsRotation() {
+    if (!videoCard.classList.contains("fs")) return;
+    const portrait = window.innerHeight > window.innerWidth;
+    videoCard.classList.toggle("fs-rotate", portrait);
+  }
+
   function enterFs(gesture) {
     videoCard.classList.add("fs");
     document.body.classList.add("fs-open");
     if (fsBtn) fsBtn.textContent = "✕";
-    // Android: se e' un tocco, prova a bloccare in orizzontale (iOS lo ignora).
+    // Android: se e' un tocco, prova a bloccare in orizzontale (iOS lo ignora
+    // e usa la rotazione CSS qui sotto).
     if (gesture) {
       try {
         if (screen.orientation && screen.orientation.lock) {
@@ -86,11 +98,17 @@
         }
       } catch (e) { /* iOS non lo supporta */ }
     }
+    applyFsRotation();
+    window.addEventListener("resize", applyFsRotation);
+    window.addEventListener("orientationchange", applyFsRotation);
   }
   function exitFs() {
     videoCard.classList.remove("fs");
+    videoCard.classList.remove("fs-rotate");
     document.body.classList.remove("fs-open");
     if (fsBtn) fsBtn.textContent = "⛶";
+    window.removeEventListener("resize", applyFsRotation);
+    window.removeEventListener("orientationchange", applyFsRotation);
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
   }
   function toggleFs() {

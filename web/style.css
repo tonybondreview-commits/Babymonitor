@@ -187,6 +187,16 @@ main { max-width: 620px; margin: 0 auto; padding: 16px; display: grid; gap: 16px
   position: fixed; inset: 0; z-index: 300; border-radius: 0; border: none;
   aspect-ratio: auto; width: 100vw; height: 100vh; height: 100dvh;
 }
+/* Finto landscape su iPhone/iPad: il telefono resta in verticale ma ruotiamo
+   il video di 90°, cosi' riempie lo schermo "sdraiato". I comandi, essendo
+   figli, ruotano insieme al video e restano al loro posto. */
+.video-card.fs.fs-rotate {
+  inset: auto; top: 50%; left: 50%;
+  width: 100vh; width: 100dvh;
+  height: 100vw; height: 100dvw;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+}
 body.fs-open { overflow: hidden; }
 
 /* ---- PTZ (joystick sul video) ------------------------------------- */
