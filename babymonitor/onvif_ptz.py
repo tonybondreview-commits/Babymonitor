@@ -187,6 +187,15 @@ class PtzController:
     def _base(self) -> str:
         return "http://%s:%d" % (self.ip, self.port)
 
+    def _candidate_ports(self) -> list[int]:
+        """Porte ONVIF da provare. Se ne e' salvata una (da una configurazione
+        precedente) la proviamo per prima, ma NON ci fermiamo li': se non
+        risponde tentiamo comunque le altre comuni (2020 = Tapo, ecc.), cosi'
+        cambiando camera non si resta bloccati sulla vecchia porta."""
+        if self.port:
+            return [self.port] + [p for p in COMMON_ONVIF_PORTS if p != self.port]
+        return list(COMMON_ONVIF_PORTS)
+
     def _ensure(self) -> bool:
         with self._lock:
             if self._checked:
@@ -195,7 +204,7 @@ class PtzController:
             if not self.ip:
                 return False
 
-            ports = [self.port] if self.port else COMMON_ONVIF_PORTS
+            ports = self._candidate_ports()
             for port in ports:
                 base = "http://%s:%d" % (self.ip, port)
                 media_x, ptz_x, responded = get_capabilities(base, self.user, self.password)
@@ -256,7 +265,7 @@ class PtzController:
             out["hint"] = "IP della camera non impostato."
             return out
 
-        ports = [self.port] if self.port else COMMON_ONVIF_PORTS
+        ports = self._candidate_ports()
         onvif_ok = False
         for port in ports:
             base = "http://%s:%d" % (self.ip, port)

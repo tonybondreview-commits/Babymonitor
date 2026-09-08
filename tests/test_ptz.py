@@ -67,3 +67,37 @@ def test_ptz_bad_direction(monkeypatch):
     _fake_camera(monkeypatch)
     ptz = PtzController("192.168.1.67", "admin", "admin123", onvif_port=5000)
     assert ptz.move("diagonal") is False
+
+
+def test_candidate_ports_falls_back_beyond_saved():
+    # Con una porta salvata (es. vecchia Yoosee 5000) proviamo QUELLA per prima
+    # ma poi anche le altre comuni, 2020 (Tapo) inclusa.
+    ptz = PtzController("192.168.1.118", "admin123", "x", onvif_port=5000)
+    ports = ptz._candidate_ports()
+    assert ports[0] == 5000
+    assert 2020 in ports
+    assert len(ports) == len(set(ports))  # nessun doppione
+
+
+def test_diagnose_tries_2020_when_saved_port_dead(monkeypatch):
+    # 5000 (salvata) non risponde, la Tapo risponde su 2020 con PTZ.
+    def fake_post(url, body, user, password, action="", timeout=6.0):
+        if ":2020" not in url:
+            return ""  # solo la 2020 e' viva
+        if "GetCapabilities" in body:
+            return ('<s:Envelope><Media><XAddr>http://192.168.1.118:2020/onvif/Media</XAddr></Media>'
+                    '<PTZ><XAddr>http://192.168.1.118:2020/onvif/PTZ</XAddr></PTZ></s:Envelope>')
+        if "GetProfiles" in body:
+            return ('<GetProfilesResponse><Profiles token="profile_1">'
+                    '<PTZConfiguration token="PTZ"/></Profiles></GetProfilesResponse>')
+        if "<Stop" in body:
+            return "<StopResponse/>"
+        return ""
+    monkeypatch.setattr(o, "_post", fake_post)
+    ptz = PtzController("192.168.1.118", "admin123", "x", onvif_port=5000)
+    diag = ptz.diagnose()
+    assert diag["available"] is True
+    assert diag["configured_port"] == 2020
+    assert ":2020" in diag["ptz_url"]
+    # e il controllo "vero" trova anche lui la 2020
+    assert ptz.is_available() is True

@@ -9,7 +9,7 @@ applicazione "companion" separata che gira su un PC / Raspberry Pi / vecchio
 telefono e si collega alla camera sulla rete locale.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 # Data/nota della build: cambia ad ogni aggiornamento, cosi' dall'app si vede
 # subito se il codice nuovo e' davvero in esecuzione.
-__build__ = "2026-09-08 · Tapo + landscape iOS + diagnostica PTZ"
+__build__ = "2026-09-08 · PTZ: prova sempre la 2020 (Tapo), non solo la porta salvata"
