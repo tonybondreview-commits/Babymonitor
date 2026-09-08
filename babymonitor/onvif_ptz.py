@@ -234,6 +234,86 @@ class PtzController:
     def is_available(self) -> bool:
         return self._ensure()
 
+    def diagnose(self) -> dict:
+        """Ripercorre passo-passo il rilevamento ONVIF/PTZ e racconta cosa
+        succede a ogni tappa. Serve per capire PERCHE' il joystick non compare
+        (porta sbagliata, credenziali rifiutate, camera senza PTZ...).
+
+        NON mette in cache e NON espone la password.
+        """
+        steps: list[dict] = []
+        out = {
+            "ip": self.ip,
+            "username": self.user,
+            "has_password": bool(self.password),
+            "configured_port": self.port,
+            "available": False,
+            "ptz_url": "",
+            "steps": steps,
+            "hint": "",
+        }
+        if not self.ip:
+            out["hint"] = "IP della camera non impostato."
+            return out
+
+        ports = [self.port] if self.port else COMMON_ONVIF_PORTS
+        onvif_ok = False
+        for port in ports:
+            base = "http://%s:%d" % (self.ip, port)
+            media_x, ptz_x, responded = get_capabilities(base, self.user, self.password)
+            steps.append({"port": port, "onvif_responded": responded,
+                          "media_xaddr": media_x, "ptz_xaddr": ptz_x})
+            if not responded:
+                continue
+            onvif_ok = True
+
+            token, has_ptz = "", False
+            media_urls = ([media_x] if media_x else []) + [base + p for p in MEDIA_PATHS]
+            for murl in media_urls:
+                resp = _post(murl, _b_getprofiles(), self.user, self.password,
+                             action=_NS_MEDIA + "/GetProfiles")
+                token, has_ptz = parse_profile(resp)
+                if token or "fault" in resp.lower():
+                    steps.append({"port": port, "get_profiles_url": murl,
+                                  "token_found": bool(token), "has_ptz_config": has_ptz,
+                                  "auth_fault": "fault" in resp.lower()})
+                if token:
+                    break
+            if not token:
+                out["hint"] = ("La camera parla ONVIF sulla porta %d ma non da' i "
+                               "profili video: quasi sempre utente/password ONVIF "
+                               "sbagliati (sulla Tapo: Account telecamera)." % port)
+                continue
+
+            ptz_urls = ([ptz_x] if ptz_x else []) + [base + p for p in PTZ_PATHS]
+            for purl in ptz_urls:
+                resp = _post(purl, _b_stop(token), self.user, self.password,
+                             action=_NS_PTZ + "/Stop")
+                ok = "StopResponse" in resp
+                steps.append({"port": port, "ptz_stop_url": purl, "stop_ok": ok})
+                if ok:
+                    out["available"] = True
+                    out["ptz_url"] = purl
+                    out["configured_port"] = port
+                    return out
+            if ptz_x or has_ptz:
+                out["available"] = True
+                out["ptz_url"] = ptz_x or (base + PTZ_PATHS[0])
+                out["configured_port"] = port
+                out["hint"] = ("PTZ dichiarato dalla camera ma il comando Stop non "
+                               "ha risposto: probabile endpoint PTZ diverso.")
+                return out
+            out["hint"] = ("La camera ha i profili ma NON dichiara il PTZ: questo "
+                           "modello potrebbe non essere motorizzato, o il PTZ e' su "
+                           "un endpoint non standard.")
+
+        if not onvif_ok:
+            out["hint"] = ("Nessuna risposta ONVIF su %s. Sulla Tapo la porta ONVIF "
+                           "e' la 2020: controlla che sia raggiungibile e che le "
+                           "credenziali siano quelle dell'Account telecamera."
+                           % ", ".join(str(p) for p in ports))
+        return out
+
     def move(self, direction: str) -> bool:
         if direction == "stop":
             return self.stop()

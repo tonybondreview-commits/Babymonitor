@@ -224,10 +224,20 @@ def create_app(controller: Controller) -> Flask:
             return jsonify({"error": "segmento non trovato"}), 404
         return send_file(path, mimetype="video/mp2t")
 
+    # ---- versione (per capire se l'app e' aggiornata) -----------------
+    @app.route("/api/version")
+    def api_version():
+        from . import __version__, __build__
+        return jsonify({"version": __version__, "build": __build__})
+
     # ---- PTZ (movimento camera) ---------------------------------------
     @app.route("/api/ptz/available")
     def ptz_available():
         return jsonify({"available": controller.ptz_available()})
+
+    @app.route("/api/ptz/diag")
+    def ptz_diag():
+        return jsonify(controller.ptz_diagnose())
 
     @app.route("/api/ptz", methods=["POST"])
     def ptz_move():

@@ -27,6 +27,9 @@ def main() -> int:
     parser.add_argument("--config", default="config.yaml", help="percorso del file di configurazione")
     args = parser.parse_args()
 
+    from babymonitor import __version__, __build__
+    print(f"[baby-monitor] Versione {__version__} — {__build__}")
+
     config = Config.load(args.config)
     controller = Controller(config)
     controller.start()

@@ -193,6 +193,12 @@ class Controller:
     def ptz_command(self, action: str) -> bool:
         return bool(self.ptz and self.ptz.move(action))
 
+    def ptz_diagnose(self) -> dict:
+        """Diagnostica dettagliata del PTZ (perche' il joystick non compare)."""
+        if not self.ptz:
+            return {"available": False, "hint": "PTZ non inizializzato."}
+        return self.ptz.diagnose()
+
     # ---- audio dalla camera -------------------------------------------
     def audio_available(self) -> bool:
         if self._audio_available is None:

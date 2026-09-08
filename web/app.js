@@ -527,6 +527,19 @@
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
+  // ---- versione in esecuzione (per capire se l'app si e' aggiornata) --
+  (function showVersion() {
+    const el = $("app-version");
+    if (!el) return;
+    fetch("api/version")
+      .then((r) => r.json())
+      .then((j) => {
+        el.textContent = "v" + (j.version || "?");
+        if (j.build) el.title = "Versione " + j.version + " — " + j.build;
+      })
+      .catch(() => { el.textContent = ""; });
+  })();
+
   // Al primo avvio parte il wizard; se la camera e' gia' configurata, apri
   // subito il video a schermo pieno (stile monitor).
   (async () => {
